@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: PDS Support
-    url: mailto:pds-operator@jpl.nasa.gov
-    about: Email the PDS Operator with any additional questions you may have.
+  - name: PDS Help Desk
+    url: https://pds.nasa.gov/?feedback=true
+    about: Email the PDS Help Desk with any additional questions you may have.
