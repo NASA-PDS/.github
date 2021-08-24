@@ -11,7 +11,7 @@ Whether submitting a bug report, making a pull request, asking for a new feature
 -   **Is it a code patch?**
     -   Open a new GitHub "pull request" with your patch.
     -   Make sure you describe the problem you're addressing (include links to issues if you can) and the solution you're proposing.
--   **Is it a cosemtic change, such as to code formatting, white space, etc.?** We generally don't use these kinds of contributions.
+-   **Is it a cosmetic change, such as code formatting, white space, typos, etc.?** We generally don't use these kinds of contributions.
     -   Cosmetic changes create unnecessary work in reviewing them as well as noise in the commit history.
     -   They also make backporting bugs a lot more difficult.
 -   **Is it a request for a new behavior or new feature?** Submit an issue using the "new feature" issue type.
