@@ -4,7 +4,7 @@ When contributing to this repository, first off, a moment of gratitude: 🙏 Tha
 
 Whether submitting a bug report, making a pull request, asking for a new feature, or fixing some documentation, these are all _contributions_. Please review these guidelines in order to make your contribution shine!
 
--   **Is it a security vulnerability?** If so, please check out our [security policy](../SECURITY.md).
+-   **Is it a security vulnerability?** If so, please contact the PDS Project Management Committee via our private email list `pds-pmc@googlegroups.com` so we can address the issue.
 -   **Is it a bug?**
     -   Check the issue tracker to see if it's already been reported or if something similar's been reported.
     -   If you can't find it, submit a new issue using the "bug" issue type.
