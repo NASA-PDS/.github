@@ -12,11 +12,16 @@ assignees: jordanpadams
    https://github.com/NASA-PDS/nasa-pds.github.io/wiki/Issue-Tracking#user-story-development
 -->
 
+## 🧑‍🔬 User Persona(s)
+<!-- Ideally this would be consistent within a repo and documented with the requirements. -->
+
+
 ## 💪 Motivation
 ...so that I can <!-- why do you want to do this? -->
 
 ## 📖 Additional Details
 <!-- Please prove any additional details or information that could help provide some context for the user story. -->
+
 
 ## ⚖️ Acceptance Criteria
 **Given** <!-- a condition -->
