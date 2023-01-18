@@ -1,37 +1,79 @@
 ---
 name: Feature request
-about: Suggest a new idea or new requirement for this project
-title: As a <what is the user's role?> I want to <what is the user trying to accomplish?>
+description: Suggest a new idea or new requirement for this project
+title: As a <what is the user's role?>, I want to <what is the user trying to accomplish?>
 labels: needs:triage, requirement
 assignees: jordanpadams
 
----
-
-<!--
-   For more information on how to populate this new feature request, see the PDS Wiki on User Story Development:
-   https://github.com/NASA-PDS/nasa-pds.github.io/wiki/Issue-Tracking#user-story-development
--->
-
-## 🧑‍🔬 User Persona(s)
-<!-- Ideally this would be consistent within a repo and documented with the requirements. -->
-
-
-## 💪 Motivation
-...so that I can <!-- why do you want to do this? -->
-
-## 📖 Additional Details
-<!-- Please prove any additional details or information that could help provide some context for the user story. -->
-
-
-## ⚖️ Acceptance Criteria
-**Given** <!-- a condition -->
-**When I perform** <!-- an action -->
-**Then I expect** <!-- the result -->
-
-<!-- For Internal Dev Team Use -->
-
-## ⚙️ Engineering Details
-<!--
-    Provide some design / implementation details and/or a sub-task checklist as needed. 
-    Convert issue to Epic if estimate is outside the scope of 1 sprint.
--->
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > _Thanks for filing a new feature request. We appreciate your time and effort. Please answer a few questions. For more information on how to populate this new feature request, see the PDS Wiki on User Story Development: https://github.com/NASA-PDS/nasa-pds.github.io/wiki/Issue-Tracking#user-story-development_
+  - type: dropdown
+    id: checked-for-duplicates
+    attributes:
+      label: Checked for duplicates
+      description: Have you checked for duplicate issue tickets?
+      multiple: false
+      options:
+        - "Yes - I've already checked"
+        - "No - I haven't checked"
+    validations:
+      required: yes
+  - type: textarea
+    id: related-problems
+    attributes:
+      label: Related problems
+      description: Is your feature request related to any problems? Please help us understand if so, including linking to any other issue tickets.
+      placeholder: Tell us the problems
+      value: "I'm frustrated when [...] happens as documented in issue-#XYZ"
+    validations:
+      required: false
+      
+  - type: textarea
+    id: person
+    attributes:
+      label: 🧑‍🔬 User Persona(s)
+      description: What specific types of users to you think this feature applies to?
+      placeholder: Node Operator, Data Engineer, Data User, etc.
+    validations:
+      required: false
+      
+  - type: textarea
+    id: person
+    attributes:
+      label: 💪 Motivation
+      description: Why? Finish the user story in the title.
+      placeholder: "...so that I can [why do you want to do this?]"
+    validations:
+      required: false
+      
+  - type: textarea
+    id: person
+    attributes:
+      label: 📖 Additional Details
+      description: Provide any additional details or information that could help provide some context for the user story.
+    validations:
+      required: false
+      
+  - type: textarea
+    id: person
+    attributes:
+      label: Acceptance Criteria
+      description: To be filled out by Engineering Node Team
+      value: |
+          **Given** <!-- a condition -->
+          **When I perform** <!-- an action -->
+          **Then I expect** <!-- the result -->
+    validations:
+      required: false
+      
+  - type: textarea
+    id: engineering-details
+    attributes:
+      label: ⚙️ Engineering Details
+      description: To be filled out by Engineering Node Team
+      value:  Provide some design / implementation details and/or a sub-task checklist as needed. Convert issue to Epic if estimate is outside the scope of 1 sprint.
+    validations:
+      required: false
