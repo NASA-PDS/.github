@@ -31,7 +31,7 @@ body:
       required: false
       
   - type: textarea
-    id: person
+    id: personas
     attributes:
       label: 🧑‍🔬 User Persona(s)
       description: What specific types of users to you think this feature applies to?
@@ -40,7 +40,7 @@ body:
       required: false
       
   - type: textarea
-    id: person
+    id: motivation
     attributes:
       label: 💪 Motivation
       description: Why? Finish the user story in the title.
@@ -49,7 +49,7 @@ body:
       required: false
       
   - type: textarea
-    id: person
+    id: details
     attributes:
       label: 📖 Additional Details
       description: Provide any additional details or information that could help provide some context for the user story.
@@ -57,7 +57,7 @@ body:
       required: false
       
   - type: textarea
-    id: person
+    id: acceptance-criteria
     attributes:
       label: Acceptance Criteria
       description: To be filled out by Engineering Node Team
