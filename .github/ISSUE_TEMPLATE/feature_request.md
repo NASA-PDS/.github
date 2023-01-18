@@ -1,4 +1,3 @@
----
 name: Feature request
 description: Suggest a new idea or new requirement for this project
 title: As a <what is the user's role?>, I want to <what is the user trying to accomplish?>
