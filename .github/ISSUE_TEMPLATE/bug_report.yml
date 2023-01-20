@@ -76,7 +76,7 @@ body:
     attributes:
        label: 🦄 Related requirements
        description: If known, provide links to the requirements/user stories applicable to this bug.
-       value: 🦄 "#xyz"
+       value: 🦄 \#xyz
 
   - type: markdown
     attributes:
