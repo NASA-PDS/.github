@@ -1,43 +1,90 @@
----
 name: Bug report
 about: Create a report to help us improve
 title: "<system feature> <is not/does not> <expected behaviour>"
 labels: bug, needs:triage
 assignees: jordanpadams
 
----
+body:
+  - type: dropdown
+    id: checked-for-duplicates
+    attributes:
+      label: Checked for duplicates
+      description: Have you checked for duplicate issue tickets?
+      multiple: false
+      options:
+        - "Yes - I've already checked"
+        - "No - I haven't checked"
+    validations:
+      required: yes
+  - type: textarea
+    id: description
+    attributes:
+      label: 🐛 Describe the bug
+      description: A clear and concise description of what the bug is. Plain-text snippets and/or screenshots welcome.
+      placeholder: Tell us what you saw
+      value: "When I did [...] action, I noticed [...]"
+    validations:
+      required: true
+ 
+   - type: textarea
+    id: expected-behavior
+    attributes:
+      label: 🕵️ Expected behavior
+      description: A clear and concise description of what you expected to happen
+      placeholder: Tell us what you expected
+      value: "I expected [...]"
+    validations:
+      required: true
+ 
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 📜 To Reproduce
+      description: "How would we reproduce this bug? Please walk us through it step by step. Plain-text snippets and/or screenshots welcome."
+      value: |
+        1.
+        2.
+        3.
+        ...
+      render: bash
+ 
+  - type: textarea
+    id: environment
+    attributes:
+      label: 🖥 Environment Info
+      description: "What is your environment? Include any computer hardware, operating system, framework, browser, time-of-day or other contextual information related to your issue"
+      value: |
+        - Version of this software [e.g. vX.Y.Z]
+        - Operating System: [e.g. MacOSX with Docker Desktop vX.Y]
+        ...
+      render: bash
 
-## 🐛 Describe the bug
-<!-- A clear and concise description of what the bug is. -->
+  - type: textarea
+    id: environment
+    attributes:
+      label: 📚 Version of Software Used
+      description: Command-line tools should have a `-V` or `--version` flag to get this information.
 
-## 📜 To Reproduce
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+  - type: textarea
+    id: environment
+    attributes:
+      label: 🩺 Test Data / Additional context
+      description: If not provided already, upload some test data. Note: May need to create a ZIP/TAR if the files are not compatible with GitHub.
 
-## 🕵️ Expected behavior
-<!-- A clear and concise description of what you expected to happen -->
+  ---
 
-## 📚 Version of Software Used
-<!-- Software should have a `-V` or `--version` flag to get this information. -->
+  - type: markdown
+    attributes:
+      value: |
+        > **The following will be filled out by the Engineering Node Team**
 
-## 🩺 Test Data / Additional context
-<!-- If applicable, Add test data or any other context about the problem here -->
+  - type: textarea
+    id: environment
+    attributes:
+       label: 🦄 Related requirements
+       value: 🦄 #xyz
 
-##  🏞Screenshots
-<!-- If applicable, add screenshots to help explain your problem. -->
-
-## 🖥 System Info
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
-
----
-<!-- FOR DEV TEAM USE -->
-
-## 🦄 Related requirements
-
-
-## ⚙️ Engineering Details
+  - type: textarea
+    id: environment
+    attributes:
+       label: ⚙️ Engineering Details
