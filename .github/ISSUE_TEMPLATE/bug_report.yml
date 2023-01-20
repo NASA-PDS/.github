@@ -71,16 +71,17 @@ body:
       label: 🩺 Test Data / Additional context
       description: "If not provided already, upload some test data. Note: May need to create a ZIP/TAR if the files are not compatible with GitHub."
 
-  - type: markdown
-    attributes:
-      value: |
-        ## For Internal Dev Team To Complete
-
   - type: textarea
     id: requirements
     attributes:
        label: 🦄 Related requirements
-       value: 🦄 #xyz
+       description: If known, provide links to the requirements/user stories applicable to this bug.
+       value: 🦄 "#xyz"
+
+  - type: markdown
+    attributes:
+      value: |
+        ## For Internal Dev Team To Complete
 
   - type: textarea
     id: details
