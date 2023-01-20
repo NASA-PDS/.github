@@ -1,7 +1,7 @@
 name: Bug report
 description: Report a bug to help us improve
 title: <system feature> <is not/does not> <expected behaviour>
-labels: bug, needs:triage
+labels: bug, "needs:triage"
 assignees: jordanpadams
 
 body:
@@ -26,7 +26,7 @@ body:
     validations:
       required: true
  
-   - type: textarea
+  - type: textarea
     id: expected-behavior
     attributes:
       label: 🕵️ Expected behavior
@@ -70,8 +70,6 @@ body:
     attributes:
       label: 🩺 Test Data / Additional context
       description: If not provided already, upload some test data. Note: May need to create a ZIP/TAR if the files are not compatible with GitHub.
-
-  ---
 
   - type: markdown
     attributes:
