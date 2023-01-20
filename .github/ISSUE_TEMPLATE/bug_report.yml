@@ -60,13 +60,13 @@ body:
       render: bash
 
   - type: textarea
-    id: environment
+    id: version
     attributes:
       label: 📚 Version of Software Used
       description: Command-line tools should have a `-V` or `--version` flag to get this information.
 
   - type: textarea
-    id: environment
+    id: test_data
     attributes:
       label: 🩺 Test Data / Additional context
       description: "If not provided already, upload some test data. Note: May need to create a ZIP/TAR if the files are not compatible with GitHub."
@@ -77,12 +77,12 @@ body:
         > **The following will be filled out by the Engineering Node Team**
 
   - type: textarea
-    id: environment
+    id: requirements
     attributes:
        label: 🦄 Related requirements
        value: 🦄 #xyz
 
   - type: textarea
-    id: environment
+    id: details
     attributes:
        label: ⚙️ Engineering Details
