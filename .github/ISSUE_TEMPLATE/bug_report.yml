@@ -74,7 +74,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        > **The following will be filled out by the Engineering Node Team**
+        # For Internal Dev Team To Complete
 
   - type: textarea
     id: requirements
