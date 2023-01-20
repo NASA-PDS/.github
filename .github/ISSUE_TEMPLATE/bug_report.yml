@@ -1,6 +1,6 @@
 name: Bug report
 description: Report a bug to help us improve
-title: "<system feature> <is not/does not> <expected behaviour>"
+title: <system feature> <is not/does not> <expected behaviour>
 labels: bug, needs:triage
 assignees: jordanpadams
 
