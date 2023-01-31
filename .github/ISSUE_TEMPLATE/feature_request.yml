@@ -20,15 +20,6 @@ body:
         - "No - I haven't checked"
     validations:
       required: yes
-  - type: textarea
-    id: related-problems
-    attributes:
-      label: Related problems
-      description: Is your feature request related to any problems? Please help us understand if so, including linking to any other issue tickets.
-      placeholder: Tell us the problems
-      value: "I'm frustrated when [...] happens as documented in issue-#XYZ"
-    validations:
-      required: false
       
   - type: textarea
     id: personas
@@ -44,7 +35,7 @@ body:
     attributes:
       label: 💪 Motivation
       description: Why? Finish the user story in the title.
-      placeholder: "...so that I can [why do you want to do this?]"
+      value: "...so that I can [why do you want to do this?]"
     validations:
       required: false
       
@@ -52,7 +43,7 @@ body:
     id: details
     attributes:
       label: 📖 Additional Details
-      description: Provide any additional details or information that could help provide some context for the user story.
+      description: Provide any additional details, related problems, or information that could help provide some context for the user story.
     validations:
       required: false
       
@@ -78,6 +69,6 @@ body:
     attributes:
       label: ⚙️ Engineering Details
       description: To be filled out by Engineering Node Team
-      value:  Provide some design / implementation details and/or a sub-task checklist as needed. Convert issue to Epic if estimate is outside the scope of 1 sprint.
+      placeholder:  Provide some design / implementation details and/or a sub-task checklist as needed. Convert issue to Epic if estimate is outside the scope of 1 sprint.
     validations:
       required: false
