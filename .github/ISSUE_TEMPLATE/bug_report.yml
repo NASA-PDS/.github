@@ -12,8 +12,8 @@ body:
       description: Have you checked for duplicate issue tickets?
       multiple: false
       options:
-        - "Yes - I've already checked"
         - "No - I haven't checked"
+        - "Yes - I've already checked"
     validations:
       required: yes
   - type: textarea
