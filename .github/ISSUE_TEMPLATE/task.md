@@ -3,7 +3,7 @@ name: Task
 about: Low level task or action that is often too granular for testing, but helps
   towards progress on an Epic or parent story
 title: ''
-labels: B13.1, i&t.skip, task
+labels: B14.0, i&t.skip, task
 assignees: ''
 
 ---
@@ -14,4 +14,8 @@ assignees: ''
 -->
 
 ## 💡 Description
-<!-- Enter description here. Make it detailed enough someone could actually know what you are doing, but if you spend too much time on this, it probably deserves it's own story -->
+<!-- Enter description here. Make it detailed enough someone could actually know what you are doing, 
+     but if you spend too much time on this, it probably deserves it's own story.
+     
+     NOTE: Be sure to add the sprint-backlog label if you plan on doing this right now.
+-->
