@@ -1,3 +1,10 @@
+<!--
+    ************************************** REMINDER **************************************
+    PR Titles should be "user-friendly". We use these titles
+    to populate our Release Notes. Some examples can be found here:
+    https://github.com/NASA-PDS/nasa-pds.github.io/wiki/Issue-Tracking#pull-request-titles
+-->
+
 ## 🗒️ Summary
 Brief summary of changes if not sufficiently described by commit messages.
 
