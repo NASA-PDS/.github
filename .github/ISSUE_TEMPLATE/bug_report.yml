@@ -83,6 +83,18 @@ body:
         ## For Internal Dev Team To Complete
 
   - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: To be filled out by Engineering Node Team
+      value: |
+          **Given** <!-- a condition -->
+          **When I perform** <!-- an action -->
+          **Then I expect** <!-- the result -->
+    validations:
+      required: false
+
+  - type: textarea
     id: details
     attributes:
        label: ⚙️ Engineering Details
