@@ -13,7 +13,7 @@ body:
     validations:
       required: true
 
-- type: markdown
-  attributes:
-    value: |
-      **Don't forget to set a parent task using the column to the right. If it does not have one, create one.**
+  - type: markdown
+    attributes:
+      value: |
+        **Don't forget to set a parent task using the column to the right. If it does not have one, create one.**
