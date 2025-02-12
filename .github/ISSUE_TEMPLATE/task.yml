@@ -13,8 +13,7 @@ body:
     validations:
       required: true
 
-  - type: textarea
-    id: related
-    attributes:
-      label: ⚔️ Parent Epic / Related Tickets
-      description: Associate parent Epic or related tickets here or select from ZenHub right sidebar.
+- type: markdown
+  attributes:
+    value: |
+      **Don't forget to set a parent task using the column to the right. If it does not have one, create one.**
