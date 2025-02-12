@@ -4,6 +4,15 @@ labels: "B15.1,i&t.skip,task"
 projects: "NASA-PDS/14"
 
 body:
+  - type: checkboxes
+    id: parent-task
+    attributes:
+      label: Parent issue set?
+      description: From right panel, set parent issue. If one does not exist, create one.
+      options:
+        - label: Yes
+          required: true
+
   - type: textarea
     id: description
     attributes:
@@ -12,8 +21,3 @@ body:
       placeholder: Tell us what is up
     validations:
       required: true
-
-  - type: markdown
-    attributes:
-      value: |
-        **Don't forget to set a parent task using the column to the right. If it does not have one, create one.**
