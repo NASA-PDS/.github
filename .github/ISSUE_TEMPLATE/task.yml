@@ -4,15 +4,26 @@ labels: "B15.1,i&t.skip,task"
 projects: "NASA-PDS/14"
 
 body:
+  - type: dropdown
+    id: task-type
+    attributes:
+      label: New Requirement or Bug?
+      description: Are you sure this is not a new requirement or bug?
+      options:
+        - No
+        - Yes
+      validations:
+        required: true
   - type: checkboxes
     id: parent-task
     attributes:
-      label: Parent issue set?
-      description: From right panel, set parent issue. If one does not exist, create one.
+      label: Task Type
+      description: If sub-task, be sure to select Epic (Parent issue in GitHub) from right panel after creation (Relationships -> Add Parent). If release theme, be sure to update label to be `theme` instead of `task`.
       options:
-        - label: "Yes"
-          required: true
-
+        - Sub-task
+        - Theme
+      validations:
+        required: true
   - type: textarea
     id: description
     attributes:
