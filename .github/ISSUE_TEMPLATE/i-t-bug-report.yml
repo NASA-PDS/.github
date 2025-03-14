@@ -1,7 +1,7 @@
 name: I&T Bug report
 description: Report a bug to help us improve
 title: <system feature> <is not/does not> <expected behaviour>
-labels: "B14.1,bug,needs:triage"
+labels: "B16,bug,needs:triage"
 type: "Bug"
 projects: "NASA-PDS/6"
 assignees: jordanpadams
