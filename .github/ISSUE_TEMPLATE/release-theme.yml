@@ -1,4 +1,4 @@
-name: [internal] Release Theme
+name: "[internal] Release Theme"
 description: "Release theme epic that describes a high-level task to be delivered in a release."
 labels: "B16,i&t.skip,theme,Epic"
 type: "Theme"
