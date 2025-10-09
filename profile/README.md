@@ -1,10 +1,8 @@
 # 🌌 NASA Planetary Data System (PDS)
 
-Welcome to the **NASA Planetary Data System (PDS)** GitHub organization —  
-the home for open-source software supporting NASA’s planetary science data archiving, management, and discovery ecosystem.
+Welcome to the **NASA Planetary Data System (PDS)** GitHub organization, the home for open-source software supporting NASA’s planetary science data archiving, management, and discovery.
 
-The PDS is NASA’s official archive for planetary mission data, ensuring long-term preservation and open access for the global science community.  
-Our repositories include the standards, tools, and services that power the **Planetary Data Cloud** and the broader **Planetary Data Ecosystem (PDE)**.
+The PDS is NASA’s official archive for planetary mission data, ensuring long-term preservation and open access for the global science community. Our repositories include the standards, tools, and services that power the **Planetary Data Cloud** and the broader **PDS**.
 
 ---
 
