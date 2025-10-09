@@ -10,12 +10,12 @@ Our repositories include the standards, tools, and services that power the **Pla
 
 ## 🚀 What You’ll Find Here
 
-- **Core Standards** — [PDS4 Information Model](https://github.com/NASA-PDS/pds4-information-model), [LDD Manager](https://github.com/NASA-PDS/ldd-manager)  
-- **Core Tools & Services** — [Validate](https://github.com/NASA-PDS/validate), [Registry](https://github.com/NASA-PDS/registry), [PDS API](https://github.com/NASA-PDS/pds-api)  
+- **Core Standards** — [PDS4 Information Model](https://github.com/NASA-PDS/pds4-information-model)
+- **Core Tools & Services** — [Validate](https://github.com/NASA-PDS/validate), [Registry](https://github.com/NASA-PDS/registry), [Registry API](https://github.com/NASA-PDS/registry-api), [peppi](https://github.com/NASA-PDS/peppi)
 - **Data Workflows** — [Nucleus](https://github.com/NASA-PDS/nucleus), [Data Upload Manager](https://github.com/NASA-PDS/data-upload-manager)  
-- **Web & User Experience** — [pds-engineering](https://github.com/NASA-PDS/pds-engineering), [feedback-widget](https://github.com/NASA-PDS/feedback-widget)
+- **Web & User Experience** — [web-modernization](https://github.com/NASA-PDS/web-modernization), [feedback-widget](https://github.com/NASA-PDS/feedback-widget)
 
-For an overview of current releases and roadmap, visit our [Developer Wiki →](https://github.com/NASA-PDS/nasa-pds.github.io/wiki)
+For an overview of current releases and roadmap, visit our [github.io site →](https://nasa-pds.github.io/)
 
 ---
 
