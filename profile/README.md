@@ -15,14 +15,13 @@ Our repositories include the standards, tools, and services that power the **Pla
 - **Data Workflows** — [Nucleus](https://github.com/NASA-PDS/nucleus), [Data Upload Manager](https://github.com/NASA-PDS/data-upload-manager)  
 - **Web & User Experience** — [web-modernization](https://github.com/NASA-PDS/web-modernization), [feedback-widget](https://github.com/NASA-PDS/feedback-widget)
 
-For an overview of current releases and roadmap, visit our [github.io site →](https://nasa-pds.github.io/)
+For a deeper dive of all that is available, and an overview of current releases and roadmap, visit our [github.io site →](https://nasa-pds.github.io/)
 
 ---
 
 ## 🧪 For Developers
 
-- 🧭 **Developer Docs:** [nasa-pds.github.io](https://nasa-pds.github.io)  
-- 💬 **Working Groups:** [PDS GitHub Discussions](https://github.com/NASA-PDS/registry/discussions)  
+- 🧭 **Developer Docs:** [nasa-pds.github.io wiki](https://github.com/NASA-PDS/nasa-pds.github.io/wiki)  
 - ⚙️ **Contribution Guidelines:** [CONTRIBUTING.md](https://github.com/NASA-PDS/.github/blob/main/CONTRIBUTING.md)  
 - 🤖 **Pull Request Reviews:** [copilot-instructions.md](https://github.com/NASA-PDS/copilot-instructions.md)
 
