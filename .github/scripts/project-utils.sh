@@ -310,7 +310,7 @@ add_to_sprint() {
         echo "⚠️  No projects were updated"
     fi
 
-    return $success_count
+    return 0
 }
 
 # Remove issue from sprint (clear iteration field) for all build projects
@@ -385,5 +385,5 @@ remove_from_sprint() {
         echo "⚠️  No projects were updated"
     fi
 
-    return $success_count
+    return 0
 }
