@@ -297,7 +297,7 @@ add_to_sprint() {
         # Set iteration to current
         if set_iteration_to_current "$project_id" "$item_id"; then
             echo "✅ Set iteration to @current in project #$project_number"
-            ((success_count++))
+            success_count=$((success_count + 1))
         else
             echo "❌ Failed to set iteration in project #$project_number"
         fi
@@ -372,7 +372,7 @@ remove_from_sprint() {
         # Clear the sprint/iteration field
         if clear_iteration "$project_id" "$item_id"; then
             echo "✅ Cleared sprint in project #$project_number"
-            ((success_count++))
+            success_count=$((success_count + 1))
         else
             echo "❌ Failed to clear sprint in project #$project_number"
         fi
