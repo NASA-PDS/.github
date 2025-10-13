@@ -26,13 +26,23 @@ jobs:
     name: Add issue to GitHub Project(s)
 
     steps:
+      - name: Get issue node ID
+        id: get_issue_id
+        env:
+          GH_TOKEN: ${{ secrets.gh_token }}
+        run: |
+          # Get the issue's global node ID
+          issue_id=$(gh api repos/${{ inputs.repository }}/issues/${{ inputs.issue_number }} --jq '.node_id')
+          echo "issue_id=$issue_id" >> $GITHUB_OUTPUT
+          echo "Issue node ID: $issue_id"
+
       - name: Add to projects
         env:
           GH_TOKEN: ${{ secrets.gh_token }}
-          ISSUE_URL: https://github.com/${{ inputs.repository }}/issues/${{ inputs.issue_number }}
+          ISSUE_ID: ${{ steps.get_issue_id.outputs.issue_id }}
           PROJECT_NUMBERS: ${{ inputs.project_numbers }}
         run: |
-          echo "Adding issue $ISSUE_URL to project(s): $PROJECT_NUMBERS"
+          echo "Adding issue to project(s): $PROJECT_NUMBERS"
 
           # Extract org from repository
           org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
@@ -45,11 +55,37 @@ jobs:
 
             echo "Adding to project #$project_num..."
 
-            # Build project URL
-            project_url="https://github.com/orgs/$org/projects/$project_num"
+            # Get the project ID from the project number
+            project_id=$(gh api graphql -f query="
+              query {
+                organization(login: \"$org\") {
+                  projectsV2(first: 100) {
+                    nodes {
+                      id
+                      number
+                    }
+                  }
+                }
+              }" --jq ".data.organization.projectsV2.nodes[] | select(.number == $project_num) | .id")
 
-            # Add issue to project using gh CLI
-            if gh project item-add "$project_url" --url "$ISSUE_URL"; then
+            if [ -z "$project_id" ]; then
+              echo "❌ Could not find project #$project_num"
+              exit 1
+            fi
+
+            echo "Project ID: $project_id"
+
+            # Add the issue to the project using GraphQL mutation
+            gh api graphql -f query="
+              mutation {
+                addProjectV2ItemById(input: {projectId: \"$project_id\", contentId: \"$ISSUE_ID\"}) {
+                  item {
+                    id
+                  }
+                }
+              }"
+
+            if [ $? -eq 0 ]; then
               echo "✅ Successfully added to project #$project_num"
             else
               echo "❌ Failed to add to project #$project_num"
