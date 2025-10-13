@@ -34,6 +34,9 @@ jobs:
         run: |
           echo "Adding issue $ISSUE_URL to project(s): $PROJECT_NUMBERS"
 
+          # Extract org from repository
+          org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
+
           # Split comma-separated project numbers and process each
           IFS=',' read -ra PROJECTS <<< "$PROJECT_NUMBERS"
           for project_num in "${PROJECTS[@]}"; do
@@ -42,11 +45,11 @@ jobs:
 
             echo "Adding to project #$project_num..."
 
-            # Extract org from repository
-            org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
+            # Build project URL
+            project_url="https://github.com/orgs/$org/projects/$project_num"
 
             # Add issue to project using gh CLI
-            if gh project item-add "$project_num" --owner "$org" --url "$ISSUE_URL"; then
+            if gh project item-add "$project_url" --url "$ISSUE_URL"; then
               echo "✅ Successfully added to project #$project_num"
             else
               echo "❌ Failed to add to project #$project_num"
