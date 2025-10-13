@@ -2,7 +2,7 @@ name: Label-based Project Management
 
 on:
   issues:
-    types: [labeled]
+    types: [labeled, unlabeled]
 
 jobs:
   label-to-project:
@@ -11,6 +11,7 @@ jobs:
       issue_number: ${{ github.event.issue.number }}
       repository: ${{ github.repository }}
       label_name: ${{ github.event.label.name }}
+      action: ${{ github.event.action }}
     secrets:
       # IMPORTANT: GITHUB_TOKEN does not have permission for org projects
       # You must create a PAT with 'project' scope and add it as ORG_PROJECT_PAT
