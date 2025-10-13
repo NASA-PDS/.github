@@ -145,7 +145,7 @@ get_iteration_field() {
                     }
                 }
             }
-        }" --jq '.data.node.fields.nodes[] | select(.name == "Iteration")'
+        }" --jq '.data.node.fields.nodes[] | select(.name == "Iteration" or .name == "Sprint")'
 }
 
 # Set iteration field to current iteration
