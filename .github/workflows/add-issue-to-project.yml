@@ -1,0 +1,57 @@
+name: Add Issue to Project
+
+on:
+  workflow_call:
+    inputs:
+      issue_number:
+        description: 'Issue number'
+        required: true
+        type: number
+      repository:
+        description: 'Repository name (org/repo format)'
+        required: true
+        type: string
+      project_numbers:
+        description: 'Comma-separated list of project numbers (e.g., "6,22")'
+        required: true
+        type: string
+    secrets:
+      gh_token:
+        description: 'GitHub token with project write permissions'
+        required: true
+
+jobs:
+  add-to-project:
+    runs-on: ubuntu-latest
+    name: Add issue to GitHub Project(s)
+
+    steps:
+      - name: Add to projects
+        env:
+          GH_TOKEN: ${{ secrets.gh_token }}
+          ISSUE_URL: https://github.com/${{ inputs.repository }}/issues/${{ inputs.issue_number }}
+          PROJECT_NUMBERS: ${{ inputs.project_numbers }}
+        run: |
+          echo "Adding issue $ISSUE_URL to project(s): $PROJECT_NUMBERS"
+
+          # Split comma-separated project numbers and process each
+          IFS=',' read -ra PROJECTS <<< "$PROJECT_NUMBERS"
+          for project_num in "${PROJECTS[@]}"; do
+            # Trim whitespace
+            project_num=$(echo "$project_num" | xargs)
+
+            echo "Adding to project #$project_num..."
+
+            # Extract org from repository
+            org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
+
+            # Add issue to project using gh CLI
+            if gh project item-add "$project_num" --owner "$org" --url "$ISSUE_URL"; then
+              echo "✅ Successfully added to project #$project_num"
+            else
+              echo "❌ Failed to add to project #$project_num"
+              exit 1
+            fi
+          done
+
+          echo "✅ All done!"
