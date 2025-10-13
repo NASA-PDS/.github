@@ -28,13 +28,27 @@ Find your project number from the project URL:
 
 ### Permissions
 
-The workflow uses `GITHUB_TOKEN` which should have the necessary permissions. If you encounter permission issues, you may need to:
+**IMPORTANT:** The default `GITHUB_TOKEN` does NOT have permissions to modify organization-level projects. You must create and configure a Personal Access Token (PAT).
 
-1. Go to your repository Settings → Actions → General
-2. Under "Workflow permissions", ensure "Read and write permissions" is selected
-3. Check "Allow GitHub Actions to create and approve pull requests" if needed
+#### Required Setup:
 
-Or create a Personal Access Token (PAT) or GitHub App token with project write permissions.
+1. **Create a PAT (Personal Access Token)**:
+   - Go to https://github.com/settings/tokens/new (or Settings → Developer settings → Personal access tokens → Tokens (classic))
+   - Name it something like "NASA-PDS Project Automation"
+   - Select scopes:
+     - `repo` (Full control of private repositories)
+     - `project` (Full control of projects) - **This is required!**
+   - Generate and copy the token
+
+2. **Add PAT as an Organization Secret**:
+   - Go to https://github.com/organizations/NASA-PDS/settings/secrets/actions
+   - Click "New organization secret"
+   - Name: `ORG_PROJECT_PAT`
+   - Value: Paste your PAT
+   - Repository access: Select "All repositories" or specific repos as needed
+
+3. **Update the workflow file**:
+   - Change `gh_token: ${{ secrets.GITHUB_TOKEN }}` to `gh_token: ${{ secrets.ORG_PROJECT_PAT }}`
 
 ### Common Projects
 
