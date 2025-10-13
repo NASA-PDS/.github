@@ -26,26 +26,32 @@ jobs:
     name: Add issue to GitHub Project(s)
 
     steps:
-      - name: Get issue node ID
-        id: get_issue_id
-        env:
-          GH_TOKEN: ${{ secrets.gh_token }}
-        run: |
-          # Get the issue's global node ID
-          issue_id=$(gh api repos/${{ inputs.repository }}/issues/${{ inputs.issue_number }} --jq '.node_id')
-          echo "issue_id=$issue_id" >> $GITHUB_OUTPUT
-          echo "Issue node ID: $issue_id"
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+        with:
+          repository: NASA-PDS/.github
+          sparse-checkout: |
+            .github/scripts
+          sparse-checkout-cone-mode: false
 
       - name: Add to projects
         env:
           GH_TOKEN: ${{ secrets.gh_token }}
-          ISSUE_ID: ${{ steps.get_issue_id.outputs.issue_id }}
+          REPOSITORY: ${{ inputs.repository }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
           PROJECT_NUMBERS: ${{ inputs.project_numbers }}
         run: |
+          # Source utility functions
+          source .github/scripts/project-utils.sh
+
           echo "Adding issue to project(s): $PROJECT_NUMBERS"
 
           # Extract org from repository
-          org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
+          org=$(echo "$REPOSITORY" | cut -d'/' -f1)
+
+          # Get issue node ID once
+          issue_id=$(get_issue_id "$REPOSITORY" "$ISSUE_NUMBER")
+          echo "Issue node ID: $issue_id"
 
           # Split comma-separated project numbers and process each
           IFS=',' read -ra PROJECTS <<< "$PROJECT_NUMBERS"
@@ -53,20 +59,11 @@ jobs:
             # Trim whitespace
             project_num=$(echo "$project_num" | xargs)
 
-            echo "Adding to project #$project_num..."
+            echo ""
+            echo "Processing project #$project_num..."
 
             # Get the project ID from the project number
-            project_id=$(gh api graphql -f query="
-              query {
-                organization(login: \"$org\") {
-                  projectsV2(first: 100) {
-                    nodes {
-                      id
-                      number
-                    }
-                  }
-                }
-              }" --jq ".data.organization.projectsV2.nodes[] | select(.number == $project_num) | .id")
+            project_id=$(get_project_id_by_number "$org" "$project_num")
 
             if [ -z "$project_id" ]; then
               echo "❌ Could not find project #$project_num"
@@ -75,22 +72,16 @@ jobs:
 
             echo "Project ID: $project_id"
 
-            # Add the issue to the project using GraphQL mutation
-            gh api graphql -f query="
-              mutation {
-                addProjectV2ItemById(input: {projectId: \"$project_id\", contentId: \"$ISSUE_ID\"}) {
-                  item {
-                    id
-                  }
-                }
-              }"
+            # Add issue to project (idempotent)
+            item_id=$(ensure_issue_in_project "$project_id" "$issue_id")
 
-            if [ $? -eq 0 ]; then
-              echo "✅ Successfully added to project #$project_num"
+            if [ -n "$item_id" ]; then
+              echo "✅ Issue in project #$project_num (item: $item_id)"
             else
               echo "❌ Failed to add to project #$project_num"
               exit 1
             fi
           done
 
+          echo ""
           echo "✅ All done!"

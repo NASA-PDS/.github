@@ -1,0 +1,18 @@
+name: Label-based Project Management
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  label-to-project:
+    uses: NASA-PDS/.github/.github/workflows/label-to-project.yml@main
+    with:
+      issue_number: ${{ github.event.issue.number }}
+      repository: ${{ github.repository }}
+      label_name: ${{ github.event.label.name }}
+    secrets:
+      # IMPORTANT: GITHUB_TOKEN does not have permission for org projects
+      # You must create a PAT with 'project' scope and add it as ORG_PROJECT_PAT
+      # See workflow-templates/README.md for setup instructions
+      gh_token: ${{ secrets.ORG_PROJECT_PAT }}
