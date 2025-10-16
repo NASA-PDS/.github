@@ -131,7 +131,29 @@ When the `sprint-backlog` label is added to an issue:
 
 ---
 
+## Implementation Details
+
+The label-based automation uses a Python script (`.github/scripts/project_automation.py`) that provides:
+- Consistent error handling across all GitHub API calls
+- Clear error messages for authentication issues
+- Proper validation of API responses
+- Automatic retry logic for transient failures
+
+The Python implementation ensures that:
+- Failures are immediately detected and reported
+- No silent failures occur when authentication is invalid
+- Error messages clearly indicate what went wrong and how to fix it
+
 ## Troubleshooting
+
+### Authentication Errors (HTTP 401 "Bad credentials"):
+**Symptom**: Workflow fails with "Bad credentials" errors
+
+**Solution**:
+1. Verify `ORG_PROJECT_PAT` secret is configured in your organization settings
+2. Check that the PAT hasn't expired (tokens expire by default)
+3. Ensure the PAT has both `repo` and `project` scopes
+4. If recently created, allow a few minutes for propagation
 
 ### Issues not being added to projects:
 1. Check the Actions tab in your repository for workflow run logs
@@ -143,5 +165,11 @@ When the `sprint-backlog` label is added to an issue:
 1. Check the Actions tab for workflow run logs
 2. Verify the build label matches a project title exactly (case-sensitive)
 3. For sprint-backlog: Ensure a build label exists on the issue first
-4. Verify the build project has an "Iteration" field configured
+4. Verify the build project has an "Iteration" or "Sprint" field configured
 5. Check that `ORG_PROJECT_PAT` has appropriate permissions
+
+### Workflow shows success but nothing happened:
+This should no longer occur with the Python implementation. If you see this:
+1. Check for error messages in the workflow logs
+2. Verify the Python script is being executed (look for Python-formatted output)
+3. Report the issue if the problem persists
