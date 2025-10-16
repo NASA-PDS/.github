@@ -42,74 +42,44 @@ jobs:
         if: inputs.action == 'labeled' && startsWith(inputs.label_name, 'B')
         env:
           GH_TOKEN: ${{ secrets.gh_token }}
-          REPOSITORY: ${{ inputs.repository }}
-          ISSUE_NUMBER: ${{ inputs.issue_number }}
-          LABEL: ${{ inputs.label_name }}
         run: |
-          # Source utility functions
-          source .github/scripts/project-utils.sh
-
-          echo "Processing build label: $LABEL"
-
           # Extract org from repository
-          org=$(echo "$REPOSITORY" | cut -d'/' -f1)
+          org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
 
-          # Get issue node ID
-          issue_id=$(get_issue_id "$REPOSITORY" "$ISSUE_NUMBER")
-          echo "Issue node ID: $issue_id"
-
-          # Find project with matching title
-          project_data=$(get_project_by_title "$org" "$LABEL")
-
-          if [ -z "$project_data" ]; then
-            echo "⚠️  No project found with title '$LABEL' - skipping"
-            exit 0
-          fi
-
-          project_id=$(echo "$project_data" | jq -r '.id')
-          project_number=$(echo "$project_data" | jq -r '.number')
-
-          echo "Found project #$project_number: $LABEL"
-          echo "Project ID: $project_id"
-
-          # Add issue to project (idempotent)
-          item_id=$(ensure_issue_in_project "$project_id" "$issue_id")
-
-          if [ -n "$item_id" ]; then
-            echo "✅ Issue in project #$project_number (item: $item_id)"
-          else
-            echo "❌ Failed to add to project #$project_number"
-            exit 1
-          fi
+          # Run Python automation script
+          python3 .github/scripts/project_automation.py \
+            add-to-build-project \
+            --repository "${{ inputs.repository }}" \
+            --issue-number ${{ inputs.issue_number }} \
+            --org "$org" \
+            --label "${{ inputs.label_name }}"
 
       - name: Add to sprint when sprint-backlog label added
         if: inputs.action == 'labeled' && inputs.label_name == 'sprint-backlog'
         env:
           GH_TOKEN: ${{ secrets.gh_token }}
-          REPOSITORY: ${{ inputs.repository }}
-          ISSUE_NUMBER: ${{ inputs.issue_number }}
         run: |
-          # Source utility functions
-          source .github/scripts/project-utils.sh
-
           # Extract org from repository
-          org=$(echo "$REPOSITORY" | cut -d'/' -f1)
+          org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
 
-          # Add to sprint - function handles all the logic
-          add_to_sprint "$REPOSITORY" "$ISSUE_NUMBER" "$org"
+          # Run Python automation script
+          python3 .github/scripts/project_automation.py \
+            add-to-sprint \
+            --repository "${{ inputs.repository }}" \
+            --issue-number ${{ inputs.issue_number }} \
+            --org "$org"
 
       - name: Remove from sprint when sprint-backlog label removed
         if: inputs.action == 'unlabeled' && inputs.label_name == 'sprint-backlog'
         env:
           GH_TOKEN: ${{ secrets.gh_token }}
-          REPOSITORY: ${{ inputs.repository }}
-          ISSUE_NUMBER: ${{ inputs.issue_number }}
         run: |
-          # Source utility functions
-          source .github/scripts/project-utils.sh
-
           # Extract org from repository
-          org=$(echo "$REPOSITORY" | cut -d'/' -f1)
+          org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
 
-          # Remove from sprint - function handles all the logic
-          remove_from_sprint "$REPOSITORY" "$ISSUE_NUMBER" "$org"
+          # Run Python automation script
+          python3 .github/scripts/project_automation.py \
+            remove-from-sprint \
+            --repository "${{ inputs.repository }}" \
+            --issue-number ${{ inputs.issue_number }} \
+            --org "$org"

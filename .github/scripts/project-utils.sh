@@ -5,12 +5,20 @@ set -e
 
 # Get issue node ID from repository and issue number
 # Usage: get_issue_id <repository> <issue_number>
-# Returns: Issue node ID
+# Returns: Issue node ID, or exits with error
 get_issue_id() {
     local repository=$1
     local issue_number=$2
 
-    gh api "repos/${repository}/issues/${issue_number}" --jq '.node_id'
+    local result=$(gh api "repos/${repository}/issues/${issue_number}" --jq '.node_id' 2>&1)
+    local exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        echo "❌ Failed to get issue ID: $result" >&2
+        return 1
+    fi
+
+    echo "$result"
 }
 
 # Get project ID from project number
@@ -227,14 +235,22 @@ clear_iteration() {
 
 # Get all labels starting with a prefix from an issue
 # Usage: get_labels_by_prefix <repository> <issue_number> <prefix>
-# Returns: List of label names (one per line)
+# Returns: List of label names (one per line), or exits with error
 get_labels_by_prefix() {
     local repository=$1
     local issue_number=$2
     local prefix=$3
 
-    gh api "repos/${repository}/issues/${issue_number}" \
-        --jq ".labels[].name | select(startswith(\"$prefix\"))"
+    local result=$(gh api "repos/${repository}/issues/${issue_number}" \
+        --jq ".labels[].name | select(startswith(\"$prefix\"))" 2>&1)
+    local exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        echo "❌ Failed to get labels: $result" >&2
+        return 1
+    fi
+
+    echo "$result"
 }
 
 # Add issue to sprint (iteration:@current) for all build projects
@@ -249,10 +265,18 @@ add_to_sprint() {
 
     # Get issue node ID
     local issue_id=$(get_issue_id "$repository" "$issue_number")
+    if [ $? -ne 0 ] || [ -z "$issue_id" ]; then
+        echo "❌ Failed to get issue ID - cannot proceed" >&2
+        return 1
+    fi
     echo "Issue node ID: $issue_id"
 
     # Find all build labels on this issue
     local build_labels=$(get_labels_by_prefix "$repository" "$issue_number" "B")
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to get build labels - cannot proceed" >&2
+        return 1
+    fi
 
     if [ -z "$build_labels" ]; then
         echo "⚠️  No build label found on issue"
@@ -325,10 +349,18 @@ remove_from_sprint() {
 
     # Get issue node ID
     local issue_id=$(get_issue_id "$repository" "$issue_number")
+    if [ $? -ne 0 ] || [ -z "$issue_id" ]; then
+        echo "❌ Failed to get issue ID - cannot proceed" >&2
+        return 1
+    fi
     echo "Issue node ID: $issue_id"
 
     # Find all build labels on this issue
     local build_labels=$(get_labels_by_prefix "$repository" "$issue_number" "B")
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to get build labels - cannot proceed" >&2
+        return 1
+    fi
 
     if [ -z "$build_labels" ]; then
         echo "ℹ️  No build labels found on issue - nothing to clear"
