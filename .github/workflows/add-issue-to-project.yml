@@ -85,3 +85,43 @@ jobs:
 
           echo ""
           echo "✅ All done!"
+
+      - name: Process build labels
+        env:
+          GH_TOKEN: ${{ secrets.gh_token }}
+        run: |
+          # Extract org from repository
+          org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
+
+          # Get all labels starting with "B" on this issue
+          echo "Checking for build labels on issue #${{ inputs.issue_number }}..."
+          build_labels=$(gh api "repos/${{ inputs.repository }}/issues/${{ inputs.issue_number }}" \
+            --jq '.labels[].name | select(startswith("B"))')
+
+          if [ -z "$build_labels" ]; then
+            echo "No build labels found on issue"
+            exit 0
+          fi
+
+          echo "Found build labels:"
+          echo "$build_labels"
+          echo ""
+
+          # Process each build label
+          while IFS= read -r label; do
+            [ -z "$label" ] && continue
+
+            echo "Processing build label: $label"
+
+            # Run Python automation script for each label
+            python3 .github/scripts/project_automation.py \
+              add-to-build-project \
+              --repository "${{ inputs.repository }}" \
+              --issue-number ${{ inputs.issue_number }} \
+              --org "$org" \
+              --label "$label"
+
+            echo ""
+          done <<< "$build_labels"
+
+          echo "✅ All build labels processed"
