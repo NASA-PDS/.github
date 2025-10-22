@@ -1,4 +1,4 @@
-name: Moves Issues To Current Iteration
+name: Moves Issues To Current Sprint
 
 on:
   schedule:
