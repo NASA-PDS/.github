@@ -17,7 +17,7 @@ jobs:
         owner: NASA-PDS
         number: 22
         token: ${{ secrets.ORG_PROJECT_PAT }}
-        iteration-field: Iteration
+        iteration-field: Sprint
         iteration: last
         new-iteration: current
         excluded-statuses: "Done"
