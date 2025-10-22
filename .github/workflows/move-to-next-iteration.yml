@@ -1,0 +1,21 @@
+on:
+  schedule:
+    # Runs "at 07:00, only on Thursday" (see https://crontab.guru)
+    - cron: '0 7 * * 4'
+  workflow_dispatch:
+
+jobs:
+  move-to-next-iteration:
+    name: Move to next iteration
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: blombard/move-to-next-iteration@master
+      with:
+        owner: NASA-PDS
+        number: 22
+        token: ${{ secrets.ORG_PROJECT_PAT }}
+        iteration-field: Iteration
+        iteration: last
+        new-iteration: current
+        excluded-statuses: "Done"
