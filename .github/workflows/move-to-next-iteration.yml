@@ -1,3 +1,5 @@
+name: Moves Issues To Current Iteration
+
 on:
   schedule:
     # Runs "at 07:00, only on Thursday" (see https://crontab.guru)
