@@ -39,7 +39,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Process build label
-        if: inputs.action == 'labeled' && startsWith(inputs.label_name, 'B')
+        if: inputs.action == 'labeled' && startsWith(inputs.label_name, 'B') && inputs.label_name != 'bug'
         env:
           GH_TOKEN: ${{ secrets.gh_token }}
         run: |

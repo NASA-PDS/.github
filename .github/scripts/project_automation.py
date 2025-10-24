@@ -9,6 +9,7 @@ including adding issues to projects and managing sprint iterations.
 import subprocess
 import json
 import sys
+import re
 from typing import Optional, List, Dict, Any
 
 
@@ -532,6 +533,11 @@ class GitHubProjectAutomation:
         """
         print(f"Processing build label: {label}")
 
+        # Validate build label format (B followed by digits)
+        if not re.match(r'^B\d+$', label):
+            print(f"ℹ️  Label '{label}' does not match build label pattern (B followed by digits) - skipping")
+            return True  # Not an error, just not a build label
+
         try:
             # Get issue node ID
             issue_id = self.get_issue_id(repository, issue_number)
@@ -541,8 +547,8 @@ class GitHubProjectAutomation:
             project_data = self.get_project_by_title(org, label)
 
             if not project_data:
-                print(f"⚠️  No project found with title '{label}' - skipping")
-                return False
+                print(f"ℹ️  No project found with title '{label}' - skipping (this is okay, the project may not exist yet)")
+                return True  # Not an error, just no matching project
 
             project_id = project_data['id']
             project_number = project_data['number']
