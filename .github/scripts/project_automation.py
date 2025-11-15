@@ -486,6 +486,7 @@ class GitHubProjectAutomation:
 
                     if not item_id:
                         print(f"ℹ️  Issue not in project #{project_number} - nothing to clear")
+                        success_count += 1  # Count as success since there's nothing to remove
                         print()
                         continue
 
