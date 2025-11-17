@@ -6,12 +6,16 @@
 -->
 
 ## 🗒️ Summary
-Brief summary of changes if not sufficiently described by commit messages.
+<!--
+   Brief summary of changes if not sufficiently described by commit messages.
+-->
 
 ## ⚙️ Test Data and/or Report
-One of the following should be included here:
-* Reference to regression test included in code (preferred wherever reasonable)
-* Attach test data here + outputs of tests
+<!--
+   One of the following should be included here:
+   * Reference to regression test included in code (preferred wherever reasonable)
+   * Attach test data here + outputs of tests
+-->
 
 ## ♻️ Related Issues
 <!--
