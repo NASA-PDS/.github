@@ -28,4 +28,23 @@
     * for issues in other repos: NASA-PDS/my_repo#1, NASA-PDS/her_repo#2
 -->
 
+## 🤓 Reviewer Checklist
 
+*Reviewers: Please verify the following before approving this pull request.*
+
+### Security & Quality
+- [ ] **SonarCloud:** Confirmed no new High or Critical security findings.
+- [ ] **Secrets Detection:** Verified that the Secrets Detection scan passed and no sensitive information (keys, tokens, PII) is exposed.
+- [ ] **Code Quality:** Code follows organization style guidelines and best practices for the specific language (e.g., PEP 8, Google Java Style).
+
+### Testing & Validation
+- [ ] **Test Accuracy:** Verified that test data is accurate, representative of real-world PDS4 scenarios, and sufficient for the logic being tested.
+- [ ] **Coverage:** Automated tests cover new logic and edge cases.
+- [ ] **Local Verification:** (If applicable) Successfully built and ran the changes in a local or staging environment.
+
+### Documentation
+- [ ] **Documentation:** README, Wiki, or inline documentation (Sphinx, Javadoc, Docstrings) have been updated to reflect these changes.
+
+### Maintenance
+- [ ] **Issue Traceability:** The PR is linked to a valid GitHub Issue or Jira Ticket.
+- [ ] **Backward Compatibility:** Confirmed that these changes do not break existing downstream dependencies or API contracts (or that breaking changes are clearly documented).
