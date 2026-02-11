@@ -32,6 +32,11 @@
 
 *Reviewers: Please verify the following before approving this pull request.*
 
+### Documentation and PR Content
+- [ ] **Documentation:** README, Wiki, or inline documentation (Sphinx, Javadoc, Docstrings) have been updated to reflect these changes.
+- [ ] **Issue Traceability:** The PR is linked to a valid GitHub Issue
+- [ ] **PR Title:** The PR title is "user-friendly" clearly identifying what is being fixed or the new feature being added, that if you saw it in the Release Notes for a tool, you would be able to get the gist of what was done.
+
 ### Security & Quality
 - [ ] **SonarCloud:** Confirmed no new High or Critical security findings.
 - [ ] **Secrets Detection:** Verified that the Secrets Detection scan passed and no sensitive information (keys, tokens, PII) is exposed.
@@ -42,9 +47,5 @@
 - [ ] **Coverage:** Automated tests cover new logic and edge cases.
 - [ ] **Local Verification:** (If applicable) Successfully built and ran the changes in a local or staging environment.
 
-### Documentation
-- [ ] **Documentation:** README, Wiki, or inline documentation (Sphinx, Javadoc, Docstrings) have been updated to reflect these changes.
-
 ### Maintenance
-- [ ] **Issue Traceability:** The PR is linked to a valid GitHub Issue or Jira Ticket.
 - [ ] **Backward Compatibility:** Confirmed that these changes do not break existing downstream dependencies or API contracts (or that breaking changes are clearly documented).
