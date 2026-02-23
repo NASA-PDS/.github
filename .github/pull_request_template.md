@@ -12,9 +12,10 @@
 
 ## ⚙️ Test Data and/or Report
 <!--
-   One of the following should be included here:
-   * Reference to regression test included in code (preferred wherever reasonable)
-   * Attach test data here + outputs of tests
+   You MUST include one of:
+   1. If automated tests, refer to where tests are documented and/or link to separate PR.
+   2. If manual tests, show procedure and/or output
+   3. If not tested, describe rationale for not including.
 -->
 
 ## ♻️ Related Issues
