@@ -10,6 +10,13 @@
    Brief summary of changes if not sufficiently described by commit messages.
 -->
 
+### 🤖 AI Assistance Disclosure
+- [ ] No AI assistance used
+- [ ] AI used for suggestions/refactoring
+- [ ] AI generated substantial portions of this code
+
+Estimated % of code influenced by AI: ___ %
+
 ## ⚙️ Test Data and/or Report
 <!--
    You MUST include one of:
