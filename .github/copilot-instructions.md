@@ -54,7 +54,7 @@
 - [ ] OpenAPI contracts updated when API changes; generated clients re-synced.
 
 ### 6) Code Quality
-- **Java**: Error Prone/SpotBugs clean; no raw types; prefer immutables; avoid Lombok magic where it harms clarity; `try-with-resources` for I/O; follow Google's Java Style Guide
+- **Java**: Compliance with [Google's Java Style Guide](https://google.github.io/styleguide/javaguide.html); avoid raw types; prefer immutables; avoid Lombok magic where it harms clarity; `try-with-resources` for I/O.
 - **Python**: Type-hints + `mypy` clean; `black` + `isort`; `pathlib` over string paths; avoid broad exceptions; follow PEP8 standards, where it makes sense.
 - **General**: Small functions; single responsibility; avoid deep nesting; meaningful names; delete dead code.
 
@@ -67,6 +67,15 @@
 - [ ] README/USAGE updated; migration notes if behavior changes.
 - [ ] CHANGELOG entry with user impact.
 - [ ] ADR added/updated for architectural decisions (when applicable).
+
+---
+
+## Additional PR Review Rules
+- For Java repositories, ensure compliance with [Google's Java Style Guide](https://google.github.io/styleguide/javaguide.html).
+- When analyzing pull requests that include a checklist:
+  1. Review each item on the checklist to the best of your ability.
+  2. Automatically check off items you’ve reviewed and mark as complete.
+  3. Leave a comment on the pull request detailing any remaining unchecked items or areas requiring additional attention.
 
 ---
 
@@ -93,78 +102,3 @@ Prioritize issues by severity:
 | **high** | Strongly recommended before merge | N² path on large data; IAM `*`; missing retries/timeouts |
 | **medium** | Should fix soon | Test gaps on new logic, unclear error messages |
 | **low** | Nice to have | Minor style, micro-perf |
-
----
-
-## Copilot Review Prompts (use these)
-
-Use these cues when analyzing diffs:
-
-- **Correctness**: “Are there unvalidated inputs, unchecked errors, or edge cases (empty, huge, malformed) that can break the code? Propose tests.”
-- **Security**: “Do changes introduce injection, path traversal, insecure deserialization, SSRF, or excessive IAM permissions? Suggest least-privilege policies.”
-- **Performance**: “What’s the big-O and memory profile? Can this stream/batch? Are OpenSearch queries paginated with `search_after`?”
-- **Resilience**: “Do outbound calls set timeouts, retries with backoff/jitter, and idempotency where needed?”
-- **API Contracts**: “If request/response shapes changed, is the OpenAPI updated and versioned? Are clients regenerated?”
-- **Testing**: “Which lines/branches are uncovered? Provide a focused test diff.”
-- **Docs**: “What should be added to README and online documentation (maven site or Sphinx docs) for users/operators?”
-
----
-
-## Snippets Copilot Can Propose
-
-**Java OpenSearch search_after (Testcontainers example)**
-```java
-// Ensure search_after for deep pagination
-// ... build query with sort on unique, immutable field(s)
-```
-
-**Python requests with robust timeouts/backoff**
-```python
-import requests, time, random
-
-def get_with_retry(url, *, attempts=5, timeout=(3.05, 10)):
-    for i in range(attempts):
-        try:
-            return requests.get(url, timeout=timeout)
-        except requests.RequestException:
-            time.sleep(min(2 ** i, 30) + random.random())
-    raise
-```
-
-**GitHub Actions safety for secrets**
-```yaml
-permissions:
-  contents: read
-  id-token: write
-  pull-requests: write
-```
-
----
-
-## Minimal Standards (fail if missing)
-- CI green on lint, type-checks, tests.
-- New/changed APIs have OpenAPI updates and sample requests.
-- New logic **must** have unit tests; external effects have integration tests.
-- No hard-coded secrets; no wildcard IAM for new infra.
-- Performance concerns acknowledged with test or comment if unavoidable.
-
----
-
-## NASA-PDS Context Cues for Copilot
-- Prefer **information-model-driven** approaches (PDS4).
-- Respect data volume/heterogeneity: design for **scalability** and **streaming**.
-- Be **cloud cost aware** (S3, OpenSearch, egress).
-- Keep **backwards compatibility** and migration paths visible.
-
----
-
-## What to Praise (so we keep it!)
-- Deleted code and simplified flows.
-- Replacing deep pagination with `search_after`.
-- Adding property-based tests for parsers/label readers.
-- Converting ad-hoc scripts into repeatable CI jobs.
-- Clear, documented error messages and structured logs.
-
----
-
-**End of file.**
