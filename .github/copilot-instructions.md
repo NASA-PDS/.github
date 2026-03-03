@@ -73,9 +73,10 @@
 ## Additional PR Review Rules
 - For Java repositories, ensure compliance with [Google's Java Style Guide](https://google.github.io/styleguide/javaguide.html).
 - When analyzing pull requests that include a checklist:
-  1. Review each item on the checklist to the best of your ability.
-  2. Automatically check off items you’ve reviewed and mark as complete.
-  3. Leave a comment on the pull request detailing any remaining unchecked items or areas requiring additional attention.
+  1. Carefully review **all checklist items** included in the PR description to the best of your ability.
+  2. **Check off each item directly in the PR description** for items that Copilot confirms have been satisfied during the review process.
+  3. If additional clarification or action is needed, leave a comment on the checklist item in the PR for the contributor.
+  4. After completing the checklist review, leave a **summary comment** detailing which items remain unchecked and suggestions for addressing them.
 
 ---
 
