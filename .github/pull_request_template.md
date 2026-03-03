@@ -12,7 +12,8 @@
 
 ### 🤖 AI Assistance Disclosure
 - [ ] No AI assistance used
-- [ ] AI used for suggestions/refactoring
+- [ ] AI used for light assistance (e.g., suggestions, refactoring, documentation help, minor edits)
+- [ ] AI used for moderate content generation (AI generated some code or logic, but the developer authored or heavily revised the majority)
 - [ ] AI generated substantial portions of this code
 
 Estimated % of code influenced by AI: ___ %
