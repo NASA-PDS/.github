@@ -47,12 +47,14 @@ jobs:
           org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
 
           # Run Python automation script
+          # --set-sprint-if-backlog: also set current sprint if sprint-backlog is already on the issue
           python3 .github/scripts/project_automation.py \
             add-to-build-project \
             --repository "${{ inputs.repository }}" \
             --issue-number ${{ inputs.issue_number }} \
             --org "$org" \
-            --label "${{ inputs.label_name }}"
+            --label "${{ inputs.label_name }}" \
+            --set-sprint-if-backlog
 
       - name: Add to sprint when sprint-backlog label added
         if: inputs.action == 'labeled' && inputs.label_name == 'sprint-backlog'

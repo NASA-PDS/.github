@@ -97,16 +97,16 @@ class GitHubProjectAutomation:
         except GitHubAPIError as e:
             raise GitHubAPIError(f"Failed to get labels: {e}")
 
-    def get_project_by_title(self, org: str, title: str) -> Optional[Dict[str, Any]]:
+    def get_projects_by_title(self, org: str, title: str) -> List[Dict[str, Any]]:
         """
-        Get project data (id, number) from project title.
+        Get all projects with the given title.
 
         Args:
             org: Organization name
             title: Project title
 
         Returns:
-            Dictionary with 'id', 'number', and 'title' keys, or None if not found
+            List of dictionaries with 'id', 'number', and 'title' keys
 
         Raises:
             GitHubAPIError: If the API call fails
@@ -130,15 +130,25 @@ class GitHubProjectAutomation:
                 "graphql",
                 "-f", f"query={query}",
                 "-f", f"org={org}",
-                "--jq", f'.data.organization.projectsV2.nodes[] | select(.title == "{title}")'
+                "--jq", f'[.data.organization.projectsV2.nodes[] | select(.title == "{title}")]'
             ])
 
             if not result:
-                return None
+                return []
 
             return json.loads(result)
         except (GitHubAPIError, json.JSONDecodeError) as e:
-            raise GitHubAPIError(f"Failed to get project by title: {e}")
+            raise GitHubAPIError(f"Failed to get projects by title: {e}")
+
+    def get_project_by_title(self, org: str, title: str) -> Optional[Dict[str, Any]]:
+        """
+        Get first project with the given title (backward-compatible wrapper).
+
+        Returns:
+            Dictionary with 'id', 'number', and 'title' keys, or None if not found
+        """
+        projects = self.get_projects_by_title(org, title)
+        return projects[0] if projects else None
 
     def is_issue_in_project(self, project_id: str, issue_id: str) -> Optional[str]:
         """
@@ -449,55 +459,56 @@ class GitHubProjectAutomation:
             for build_label in build_labels:
                 print(f"Processing {action} for build: {build_label}")
 
-                # Find the project with matching title
-                project_data = self.get_project_by_title(org, build_label)
+                # Find all projects with matching title
+                projects = self.get_projects_by_title(org, build_label)
 
-                if not project_data:
+                if not projects:
                     print(f"⚠️  No project found for build '{build_label}' - skipping")
                     print()
                     continue
 
-                project_id = project_data['id']
-                project_number = project_data['number']
+                print(f"Found {len(projects)} project(s) for '{build_label}'")
 
-                print(f"Found project #{project_number}: {build_label}")
+                for project_data in projects:
+                    project_id = project_data['id']
+                    project_number = project_data['number']
 
-                if action == "add":
-                    # Ensure issue is in project
-                    item_id = self.ensure_issue_in_project(project_id, issue_id)
+                    print(f"Processing project #{project_number}: {build_label}")
 
-                    if not item_id:
-                        print(f"❌ Failed to add issue to project #{project_number}")
-                        print()
-                        continue
+                    if action == "add":
+                        # Ensure issue is in project
+                        item_id = self.ensure_issue_in_project(project_id, issue_id)
 
-                    print(f"✅ Issue in project (item: {item_id})")
+                        if not item_id:
+                            print(f"❌ Failed to add issue to project #{project_number}")
+                            continue
 
-                    # Set iteration to current
-                    if self.set_iteration_to_current(project_id, item_id):
-                        print(f"✅ Set iteration to @current in project #{project_number}")
-                        success_count += 1
-                    else:
-                        print(f"❌ Failed to set iteration in project #{project_number}")
+                        print(f"✅ Issue in project (item: {item_id})")
 
-                else:  # remove
-                    # Check if issue is in project
-                    item_id = self.is_issue_in_project(project_id, issue_id)
+                        # Set iteration to current
+                        if self.set_iteration_to_current(project_id, item_id):
+                            print(f"✅ Set iteration to @current in project #{project_number}")
+                            success_count += 1
+                        else:
+                            print(f"❌ Failed to set iteration in project #{project_number}")
 
-                    if not item_id:
-                        print(f"ℹ️  Issue not in project #{project_number} - nothing to clear")
-                        success_count += 1  # Count as success since there's nothing to remove
-                        print()
-                        continue
+                    else:  # remove
+                        # Check if issue is in project
+                        item_id = self.is_issue_in_project(project_id, issue_id)
 
-                    print(f"✅ Issue in project (item: {item_id})")
+                        if not item_id:
+                            print(f"ℹ️  Issue not in project #{project_number} - nothing to clear")
+                            success_count += 1  # Count as success since there's nothing to remove
+                            continue
 
-                    # Clear the sprint/iteration field
-                    if self.clear_iteration(project_id, item_id):
-                        print(f"✅ Cleared sprint in project #{project_number}")
-                        success_count += 1
-                    else:
-                        print(f"❌ Failed to clear sprint in project #{project_number}")
+                        print(f"✅ Issue in project (item: {item_id})")
+
+                        # Clear the sprint/iteration field
+                        if self.clear_iteration(project_id, item_id):
+                            print(f"✅ Cleared sprint in project #{project_number}")
+                            success_count += 1
+                        else:
+                            print(f"❌ Failed to clear sprint in project #{project_number}")
 
                 print()
 
@@ -513,21 +524,34 @@ class GitHubProjectAutomation:
             sys.exit(1)
 
 
+    def issue_has_label(self, repository: str, issue_number: int, label: str) -> bool:
+        """Check if an issue has a specific label."""
+        try:
+            result = self._run_gh_api([
+                f"repos/{repository}/issues/{issue_number}",
+                "--jq", f'.labels[].name | select(. == "{label}")'
+            ])
+            return bool(result.strip())
+        except GitHubAPIError:
+            return False
+
     def add_issue_to_build_project(
         self,
         repository: str,
         issue_number: int,
         org: str,
-        label: str
+        label: str,
+        set_sprint_if_backlog: bool = False
     ) -> bool:
         """
-        Add an issue to a build project based on label.
+        Add an issue to all build projects matching the label title.
 
         Args:
             repository: Repository in org/repo format
             issue_number: Issue number
             org: Organization name
             label: Build label (e.g., "B16")
+            set_sprint_if_backlog: If True, also set current sprint when sprint-backlog label is present
 
         Returns:
             True if successful, False otherwise
@@ -544,28 +568,46 @@ class GitHubProjectAutomation:
             issue_id = self.get_issue_id(repository, issue_number)
             print(f"Issue node ID: {issue_id}")
 
-            # Find project with matching title
-            project_data = self.get_project_by_title(org, label)
+            # Find all projects with matching title
+            projects = self.get_projects_by_title(org, label)
 
-            if not project_data:
+            if not projects:
                 print(f"ℹ️  No project found with title '{label}' - skipping (this is okay, the project may not exist yet)")
                 return True  # Not an error, just no matching project
 
-            project_id = project_data['id']
-            project_number = project_data['number']
+            print(f"Found {len(projects)} project(s) for '{label}'")
 
-            print(f"Found project #{project_number}: {label}")
-            print(f"Project ID: {project_id}")
+            # Check if sprint should be set
+            has_sprint_backlog = set_sprint_if_backlog and self.issue_has_label(repository, issue_number, "sprint-backlog")
+            if set_sprint_if_backlog:
+                print(f"sprint-backlog label present: {has_sprint_backlog}")
 
-            # Add issue to project (idempotent)
-            item_id = self.ensure_issue_in_project(project_id, issue_id)
+            all_success = True
+            for project_data in projects:
+                project_id = project_data['id']
+                project_number = project_data['number']
 
-            if item_id:
+                print(f"Found project #{project_number}: {label}")
+                print(f"Project ID: {project_id}")
+
+                # Add issue to project (idempotent)
+                item_id = self.ensure_issue_in_project(project_id, issue_id)
+
+                if not item_id:
+                    print(f"❌ Failed to add to project #{project_number}")
+                    all_success = False
+                    continue
+
                 print(f"✅ Issue in project #{project_number} (item: {item_id})")
-                return True
-            else:
-                print(f"❌ Failed to add to project #{project_number}")
-                return False
+
+                # Set sprint if sprint-backlog is present
+                if has_sprint_backlog:
+                    if self.set_iteration_to_current(project_id, item_id):
+                        print(f"✅ Set iteration to @current in project #{project_number}")
+                    else:
+                        print(f"⚠️  Failed to set iteration in project #{project_number}")
+
+            return all_success
 
         except GitHubAPIError as e:
             print(f"❌ {e}", file=sys.stderr)
@@ -604,6 +646,12 @@ def main():
         "--label",
         help="Build label (required for add-to-build-project action)"
     )
+    parser.add_argument(
+        "--set-sprint-if-backlog",
+        action="store_true",
+        default=False,
+        help="For add-to-build-project: also set current sprint if sprint-backlog label is present"
+    )
 
     args = parser.parse_args()
 
@@ -618,7 +666,8 @@ def main():
             args.repository,
             args.issue_number,
             args.org,
-            args.label
+            args.label,
+            set_sprint_if_backlog=args.set_sprint_if_backlog
         )
         sys.exit(0 if success else 1)
 
