@@ -1,5 +1,11 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Report a Security Vulnerability (internal access)
+    url: https://github.com/nasa-pds/outlaw-tracker/issues/new
+    about: NASA-PDS team members with access should report vulnerabilities here to keep them private.
+  - name: Report a Security Vulnerability (no repo access)
+    url: mailto:pds-operator@jpl.nasa.gov
+    about: If you do not have access to the outlaw-tracker repo, email pds-operator@jpl.nasa.gov to report a vulnerability privately.
   - name: PDS Help Desk
     url: https://pds.nasa.gov/?feedback=true
     about: Contact the PDS Help Desk with any additional questions you may have.
