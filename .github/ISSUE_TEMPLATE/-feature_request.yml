@@ -58,10 +58,14 @@ body:
     id: acceptance-criteria
     attributes:
       label: Acceptance Criteria
-      description: To be filled out by Engineering Node Team
+      description: >
+        To be filled out by Engineering Node Team.
+        Use Gherkin (Given/When/Then) format — this structure is required for I&T test case traceability.
+        Do NOT convert to a checklist or bullet points; the formal structure must be preserved for integration testing.
+        Add one block per scenario. Example: **Given** the registry is running **When I** submit a valid PDS4 label **Then I expect** a 200 response with the ingested product ID.
       value: |
           **Given** <!-- a condition -->
-          **When I perform** <!-- an action -->
+          **When I** <!-- perform an action -->
           **Then I expect** <!-- the result -->
     validations:
       required: false
