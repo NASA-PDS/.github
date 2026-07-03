@@ -227,6 +227,25 @@ class GitHubProjectAutomation:
         except GitHubAPIError as e:
             raise GitHubAPIError(f"Failed to add issue to project: {e}")
 
+    def remove_issue_from_project(self, project_id: str, item_id: str) -> None:
+        """Remove an item from a project."""
+        query = """
+        mutation($projectId: ID!, $itemId: ID!) {
+            deleteProjectV2Item(input: {projectId: $projectId, itemId: $itemId}) {
+                deletedItemId
+            }
+        }
+        """
+        try:
+            self._run_gh_api([
+                "graphql",
+                "-f", f"query={query}",
+                "-f", f"projectId={project_id}",
+                "-f", f"itemId={item_id}"
+            ])
+        except GitHubAPIError as e:
+            raise GitHubAPIError(f"Failed to remove issue from project: {e}")
+
     def ensure_issue_in_project(self, project_id: str, issue_id: str) -> str:
         """
         Get or add issue to project (idempotent).
@@ -662,6 +681,58 @@ class GitHubProjectAutomation:
             print(f"❌ {e}", file=sys.stderr)
             sys.exit(1)
 
+    def remove_issue_from_build_project(
+        self,
+        repository: str,
+        issue_number: int,
+        org: str,
+        label: str
+    ) -> bool:
+        """Remove an issue from all build projects matching the label title.
+
+        Args:
+            repository: Repository in org/repo format
+            issue_number: Issue number
+            org: Organization name
+            label: Build label being removed (e.g., "B18")
+
+        Returns:
+            True if successful, False otherwise
+        """
+        print(f"Removing issue from build project for label: {label}")
+
+        if not re.match(r'^B\d+$', label):
+            print(f"ℹ️  Label '{label}' does not match build label pattern — skipping")
+            return True
+
+        try:
+            issue_id = self.get_issue_id(repository, issue_number)
+            print(f"Issue node ID: {issue_id}")
+
+            projects = self.get_projects_by_title(org, label)
+
+            if not projects:
+                print(f"ℹ️  No project found with title '{label}' — nothing to remove from")
+                return True
+
+            all_success = True
+            for project_data in projects:
+                project_id = project_data['id']
+                project_number = project_data['number']
+
+                item_id = self.is_issue_in_project(project_id, issue_id)
+                if not item_id:
+                    print(f"ℹ️  Issue not in project #{project_number} — nothing to remove")
+                    continue
+
+                self.remove_issue_from_project(project_id, item_id)
+                print(f"✅ Removed issue from project #{project_number} ({label})")
+
+            return all_success
+
+        except GitHubAPIError as e:
+            print(f"❌ {e}", file=sys.stderr)
+            sys.exit(1)
 
     def get_project_id_by_number(self, org: str, project_number: int) -> Optional[str]:
         """Get project node ID from org and project number."""
@@ -1009,7 +1080,7 @@ def main():
     )
     parser.add_argument(
         "action",
-        choices=["add-to-sprint", "remove-from-sprint", "add-to-build-project", "set-product-field"],
+        choices=["add-to-sprint", "remove-from-sprint", "add-to-build-project", "remove-from-build-project", "set-product-field"],
         help="Action to perform"
     )
     parser.add_argument(
@@ -1085,6 +1156,19 @@ def main():
             args.label,
             set_sprint_if_backlog=args.set_sprint_if_backlog,
             config_path=args.config
+        )
+        sys.exit(0 if success else 1)
+
+    elif args.action == "remove-from-build-project":
+        if not args.label:
+            print("❌ --label is required for remove-from-build-project action", file=sys.stderr)
+            sys.exit(1)
+
+        success = automation.remove_issue_from_build_project(
+            args.repository,
+            args.issue_number,
+            args.org,
+            args.label
         )
         sys.exit(0 if success else 1)
 

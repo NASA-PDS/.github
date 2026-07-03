@@ -96,3 +96,17 @@ jobs:
             --repository "${{ inputs.repository }}" \
             --issue-number ${{ inputs.issue_number }} \
             --org "$org"
+
+      - name: Remove from build project when build label removed
+        if: inputs.action == 'unlabeled' && startsWith(inputs.label_name, 'B') && inputs.label_name != 'bug'
+        env:
+          GH_TOKEN: ${{ secrets.gh_token }}
+        run: |
+          org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
+
+          python3 .github/scripts/project_automation.py \
+            remove-from-build-project \
+            --repository "${{ inputs.repository }}" \
+            --issue-number ${{ inputs.issue_number }} \
+            --org "$org" \
+            --label "${{ inputs.label_name }}"
