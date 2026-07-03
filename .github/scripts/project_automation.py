@@ -10,6 +10,7 @@ import subprocess
 import json
 import sys
 import re
+import os
 from typing import Optional, List, Dict, Any
 
 
@@ -152,7 +153,7 @@ class GitHubProjectAutomation:
 
     def is_issue_in_project(self, project_id: str, issue_id: str) -> Optional[str]:
         """
-        Check if issue is already in project.
+        Check if issue is already in project by querying from the issue side.
 
         Args:
             project_id: Project node ID
@@ -165,17 +166,13 @@ class GitHubProjectAutomation:
             GitHubAPIError: If the API call fails
         """
         query = """
-        query($projectId: ID!) {
-            node(id: $projectId) {
-                ... on ProjectV2 {
-                    items(first: 100) {
+        query($issueId: ID!) {
+            node(id: $issueId) {
+                ... on Issue {
+                    projectItems(first: 20) {
                         nodes {
                             id
-                            content {
-                                ... on Issue {
-                                    id
-                                }
-                            }
+                            project { id }
                         }
                     }
                 }
@@ -187,8 +184,8 @@ class GitHubProjectAutomation:
             result = self._run_gh_api([
                 "graphql",
                 "-f", f"query={query}",
-                "-f", f"projectId={project_id}",
-                "--jq", f'.data.node.items.nodes[] | select(.content.id == "{issue_id}") | .id'
+                "-f", f"issueId={issue_id}",
+                "--jq", f'.data.node.projectItems.nodes[] | select(.project.id == "{project_id}") | .id'
             ])
 
             return result if result else None
@@ -535,13 +532,58 @@ class GitHubProjectAutomation:
         except GitHubAPIError:
             return False
 
+    def _set_project_product_field_on_item(
+        self,
+        project_id: str,
+        item_id: str,
+        repo_name: str,
+        config_path: str,
+        field_name: str = "Product"
+    ) -> bool:
+        """Set a single-select product field on an existing project item."""
+        products = self._load_products_config(config_path)
+        product_name = self._find_product_for_repo(products, repo_name)
+        if not product_name:
+            print(f"ℹ️  No product mapping for '{repo_name}' — skipping project '{field_name}' field")
+            return True
+
+        try:
+            field_data = self.get_project_single_select_field(project_id, field_name)
+            if not field_data:
+                print(f"ℹ️  No '{field_name}' field on project — skipping")
+                return True
+
+            field_id = field_data['id']
+            options = field_data.get('options', [])
+            option_id = next(
+                (o['id'] for o in options if o['name'].lower() == product_name.lower()),
+                None
+            )
+            if not option_id:
+                available = [o['name'] for o in options]
+                print(
+                    f"⚠️  No option matching '{product_name}' in project '{field_name}'. "
+                    f"Available: {available}",
+                    file=sys.stderr
+                )
+                return False
+
+            self.set_project_single_select_field(project_id, item_id, field_id, option_id)
+            print(f"✅ Set project '{field_name}' to '{product_name}'")
+            return True
+
+        except GitHubAPIError as e:
+            print(f"⚠️  Could not set project '{field_name}': {e}", file=sys.stderr)
+            return False
+
     def add_issue_to_build_project(
         self,
         repository: str,
         issue_number: int,
         org: str,
         label: str,
-        set_sprint_if_backlog: bool = False
+        set_sprint_if_backlog: bool = False,
+        config_path: Optional[str] = None
     ) -> bool:
         """
         Add an issue to all build projects matching the label title.
@@ -552,6 +594,7 @@ class GitHubProjectAutomation:
             org: Organization name
             label: Build label (e.g., "B16")
             set_sprint_if_backlog: If True, also set current sprint when sprint-backlog label is present
+            config_path: Path to pds-products.yaml; when provided, also sets the Product field
 
         Returns:
             True if successful, False otherwise
@@ -562,6 +605,8 @@ class GitHubProjectAutomation:
         if not re.match(r'^B\d+$', label):
             print(f"ℹ️  Label '{label}' does not match build label pattern (B followed by digits) - skipping")
             return True  # Not an error, just not a build label
+
+        repo_name = repository.split('/')[-1]
 
         try:
             # Get issue node ID
@@ -600,6 +645,10 @@ class GitHubProjectAutomation:
 
                 print(f"✅ Issue in project #{project_number} (item: {item_id})")
 
+                # Set Product field on project item if config provided
+                if config_path and os.path.exists(config_path):
+                    self._set_project_product_field_on_item(project_id, item_id, repo_name, config_path)
+
                 # Set sprint if sprint-backlog is present
                 if has_sprint_backlog:
                     if self.set_iteration_to_current(project_id, item_id):
@@ -614,6 +663,343 @@ class GitHubProjectAutomation:
             sys.exit(1)
 
 
+    def get_project_id_by_number(self, org: str, project_number: int) -> Optional[str]:
+        """Get project node ID from org and project number."""
+        query = """
+        query($org: String!, $number: Int!) {
+            organization(login: $org) {
+                projectV2(number: $number) {
+                    id
+                }
+            }
+        }
+        """
+        try:
+            result = self._run_gh_api([
+                "graphql",
+                "-f", f"query={query}",
+                "-f", f"org={org}",
+                "-F", f"number={project_number}",
+                "--jq", ".data.organization.projectV2.id"
+            ])
+            return result if result else None
+        except GitHubAPIError as e:
+            raise GitHubAPIError(f"Failed to get project by number: {e}")
+
+    def get_project_single_select_field(self, project_id: str, field_name: str) -> Optional[Dict[str, Any]]:
+        """Get a single-select field definition (id + options) from a project."""
+        query = """
+        query($projectId: ID!) {
+            node(id: $projectId) {
+                ... on ProjectV2 {
+                    fields(first: 50) {
+                        nodes {
+                            ... on ProjectV2SingleSelectField {
+                                id
+                                name
+                                options {
+                                    id
+                                    name
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        """
+        try:
+            result = self._run_gh_api([
+                "graphql",
+                "-f", f"query={query}",
+                "-f", f"projectId={project_id}",
+                "--jq", f'.data.node.fields.nodes[] | select(.name == "{field_name}")'
+            ])
+            return json.loads(result) if result else None
+        except (GitHubAPIError, json.JSONDecodeError) as e:
+            raise GitHubAPIError(f"Failed to get project single-select field '{field_name}': {e}")
+
+    def set_project_single_select_field(
+        self, project_id: str, item_id: str, field_id: str, option_id: str
+    ) -> None:
+        """Set a single-select field value on a project item."""
+        query = """
+        mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+            updateProjectV2ItemFieldValue(input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: { singleSelectOptionId: $optionId }
+            }) {
+                projectV2Item { id }
+            }
+        }
+        """
+        try:
+            self._run_gh_api([
+                "graphql",
+                "-f", f"query={query}",
+                "-f", f"projectId={project_id}",
+                "-f", f"itemId={item_id}",
+                "-f", f"fieldId={field_id}",
+                "-f", f"optionId={option_id}"
+            ])
+        except GitHubAPIError as e:
+            raise GitHubAPIError(f"Failed to set project single-select field: {e}")
+
+    def set_project_product_field(
+        self,
+        repository: str,
+        issue_number: int,
+        org: str,
+        project_number: int,
+        config_path: str,
+        field_name: str = "Product"
+    ) -> bool:
+        """Set a single-select field on a project item based on pds-products.yaml.
+
+        Returns True on success or benign skip, False on hard failure.
+        """
+        if not os.path.exists(config_path):
+            print(f"⚠️  Products config not found: {config_path}", file=sys.stderr)
+            return False
+
+        products = self._load_products_config(config_path)
+        repo_name = repository.split('/')[-1]
+        product_name = self._find_product_for_repo(products, repo_name)
+
+        if not product_name:
+            print(f"ℹ️  No product mapping for '{repo_name}' — skipping project '{field_name}' field")
+            return True
+
+        print(f"Repo '{repo_name}' → product '{product_name}'")
+
+        try:
+            project_id = self.get_project_id_by_number(org, project_number)
+            if not project_id:
+                print(f"❌ Could not find project #{project_number}", file=sys.stderr)
+                return False
+
+            issue_id = self.get_issue_id(repository, issue_number)
+            item_id = self.ensure_issue_in_project(project_id, issue_id)
+
+            field_data = self.get_project_single_select_field(project_id, field_name)
+            if not field_data:
+                print(f"ℹ️  No '{field_name}' field on project #{project_number} — skipping")
+                return True
+
+            field_id = field_data['id']
+            options = field_data.get('options', [])
+            option_id = next(
+                (o['id'] for o in options if o['name'].lower() == product_name.lower()),
+                None
+            )
+
+            if not option_id:
+                available = [o['name'] for o in options]
+                print(
+                    f"⚠️  No option matching '{product_name}' in project '{field_name}' field. "
+                    f"Available: {available}",
+                    file=sys.stderr
+                )
+                return False
+
+            self.set_project_single_select_field(project_id, item_id, field_id, option_id)
+            print(f"✅ Set project '{field_name}' to '{product_name}' on project #{project_number} (item {item_id})")
+            return True
+
+        except GitHubAPIError as e:
+            print(f"❌ {e}", file=sys.stderr)
+            return False
+
+    def get_org_issue_field(self, org: str, field_name: str) -> Optional[Dict[str, Any]]:
+        """Get an org-level issue field by name, returning its id and options."""
+        try:
+            result = self._run_gh_api([
+                f"orgs/{org}/issue-fields",
+                "--jq", f'.[] | select(.name == "{field_name}")'
+            ])
+            return json.loads(result) if result else None
+        except (GitHubAPIError, json.JSONDecodeError) as e:
+            raise GitHubAPIError(f"Failed to get org issue field '{field_name}': {e}")
+
+    def set_org_issue_field_value(
+        self, repository: str, issue_number: int, field_id: int, value: str
+    ) -> None:
+        """Set an org-level issue field value on an issue via REST PUT."""
+        body = json.dumps({"issue_field_values": [{"field_id": field_id, "value": value}]})
+        cmd = ["gh", "api", "-X", "PUT",
+               f"repos/{repository}/issues/{issue_number}/issue-field-values",
+               "--input", "-"]
+        try:
+            subprocess.run(cmd, input=body, capture_output=True, text=True, check=True)
+        except subprocess.CalledProcessError as e:
+            error_msg = e.stderr.strip() if e.stderr else str(e)
+            raise GitHubAPIError(f"Failed to set org issue field value: {error_msg}")
+
+    @staticmethod
+    def _load_products_config(config_path: str) -> Dict[str, Any]:
+        """Parse pds-products.yaml without external dependencies.
+
+        Returns a dict keyed by product name with 'repositories', 'github_project_name',
+        and 'ignore' entries.
+        """
+        products: Dict[str, Any] = {}
+        current_product: Optional[str] = None
+        in_products_section = False
+        in_repos = False
+
+        with open(config_path) as f:
+            for raw_line in f:
+                line = raw_line.rstrip('\n')
+                stripped = line.lstrip()
+
+                if not stripped or stripped.startswith('#'):
+                    continue
+
+                indent = len(line) - len(stripped)
+
+                if line == 'products:':
+                    in_products_section = True
+                    current_product = None
+                    in_repos = False
+                    continue
+
+                if not in_products_section:
+                    continue
+
+                # Any top-level key signals the end of the products block
+                if indent == 0:
+                    break
+
+                # Product key: 2-space indent, ends with ':'
+                if indent == 2 and stripped.endswith(':') and not stripped.startswith('-'):
+                    current_product = stripped[:-1]
+                    products[current_product] = {'repositories': []}
+                    in_repos = False
+                    continue
+
+                if current_product is None:
+                    continue
+
+                # Product properties: 4-space indent
+                if indent == 4:
+                    in_repos = False
+                    if stripped.startswith('repositories:'):
+                        in_repos = True
+                    elif stripped.startswith('github_project_name:'):
+                        val = stripped.split(':', 1)[1].strip().strip('"\'')
+                        products[current_product]['github_project_name'] = val
+                    elif stripped.startswith('ignore:'):
+                        val = stripped.split(':', 1)[1].strip()
+                        products[current_product]['ignore'] = val == 'true'
+                    continue
+
+                # Repository items: 6-space indent
+                if indent == 6 and in_repos and stripped.startswith('- '):
+                    repo = stripped[2:].strip().strip('"\'')
+                    products[current_product]['repositories'].append(repo)
+
+        return products
+
+    @staticmethod
+    def _find_product_for_repo(products: Dict[str, Any], repo_name: str) -> Optional[str]:
+        """Return the display name (github_project_name or key) for a repo, or None."""
+        for product_key, info in products.items():
+            if info.get('ignore'):
+                continue
+            if repo_name in info.get('repositories', []):
+                return info.get('github_project_name') or product_key
+        return None
+
+    def set_product_field(
+        self,
+        repository: str,
+        issue_number: int,
+        org: str,
+        config_path: str,
+        field_name: str = "Product",
+        project_numbers: Optional[List[int]] = None
+    ) -> bool:
+        """Set the Product field at both the org level and on any specified project items.
+
+        Args:
+            repository: Repository in org/repo format
+            issue_number: Issue number
+            org: Organization name
+            config_path: Path to pds-products.yaml
+            field_name: Field name to set (default: Product)
+            project_numbers: Optional list of project numbers to also set the field on
+
+        Returns True on success or benign skip, False on hard failure.
+        """
+        if not os.path.exists(config_path):
+            print(f"⚠️  Products config not found: {config_path}", file=sys.stderr)
+            return False
+
+        products = self._load_products_config(config_path)
+        repo_name = repository.split('/')[-1]
+        product_name = self._find_product_for_repo(products, repo_name)
+
+        if not product_name:
+            print(f"ℹ️  No product mapping found for '{repo_name}' — skipping '{field_name}' field")
+            return True
+
+        print(f"Repo '{repo_name}' → product '{product_name}'")
+
+        overall_success = True
+
+        # ── Org-level field ──────────────────────────────────────────────────
+        try:
+            field_data = self.get_org_issue_field(org, field_name)
+            if not field_data:
+                print(f"ℹ️  No '{field_name}' org issue field found — skipping org field")
+            else:
+                field_id = field_data['id']
+                options = field_data.get('options', [])
+                if options:
+                    valid_names = [o['name'] for o in options]
+                    if product_name not in valid_names:
+                        print(
+                            f"⚠️  '{product_name}' is not a valid option for org '{field_name}'. "
+                            f"Available: {valid_names}",
+                            file=sys.stderr
+                        )
+                        overall_success = False
+                    else:
+                        self.set_org_issue_field_value(repository, issue_number, field_id, product_name)
+                        print(f"✅ Set org '{field_name}' to '{product_name}' on {repository}#{issue_number}")
+                else:
+                    self.set_org_issue_field_value(repository, issue_number, field_id, product_name)
+                    print(f"✅ Set org '{field_name}' to '{product_name}' on {repository}#{issue_number}")
+        except GitHubAPIError as e:
+            print(f"❌ Org field: {e}", file=sys.stderr)
+            overall_success = False
+
+        # ── Project-level fields ─────────────────────────────────────────────
+        if project_numbers:
+            try:
+                issue_id = self.get_issue_id(repository, issue_number)
+            except GitHubAPIError as e:
+                print(f"❌ Could not get issue node ID: {e}", file=sys.stderr)
+                return False
+
+            for project_number in project_numbers:
+                try:
+                    project_id = self.get_project_id_by_number(org, project_number)
+                    if not project_id:
+                        print(f"⚠️  Could not find project #{project_number} — skipping", file=sys.stderr)
+                        continue
+                    item_id = self.ensure_issue_in_project(project_id, issue_id)
+                    self._set_project_product_field_on_item(
+                        project_id, item_id, repo_name, config_path, field_name
+                    )
+                except GitHubAPIError as e:
+                    print(f"⚠️  Project #{project_number} field: {e}", file=sys.stderr)
+
+        return overall_success
+
+
 def main():
     """Main entry point for CLI usage."""
     import argparse
@@ -623,7 +1009,7 @@ def main():
     )
     parser.add_argument(
         "action",
-        choices=["add-to-sprint", "remove-from-sprint", "add-to-build-project"],
+        choices=["add-to-sprint", "remove-from-sprint", "add-to-build-project", "set-product-field"],
         help="Action to perform"
     )
     parser.add_argument(
@@ -652,12 +1038,42 @@ def main():
         default=False,
         help="For add-to-build-project: also set current sprint if sprint-backlog label is present"
     )
+    parser.add_argument(
+        "--config",
+        help="Path to pds-products.yaml (required for set-product-field; optional for add-to-build-project to also set the project Product field)"
+    )
+    parser.add_argument(
+        "--field-name",
+        default="Product",
+        help="Single-select field name to set (default: Product)"
+    )
+    parser.add_argument(
+        "--project-numbers",
+        help="Comma-separated project numbers to also set the field on (for set-product-field)"
+    )
 
     args = parser.parse_args()
 
     automation = GitHubProjectAutomation()
 
-    if args.action == "add-to-build-project":
+    if args.action == "set-product-field":
+        if not args.config:
+            print("❌ --config is required for set-product-field", file=sys.stderr)
+            sys.exit(1)
+        project_numbers = None
+        if args.project_numbers:
+            project_numbers = [int(n.strip()) for n in args.project_numbers.split(',') if n.strip()]
+        success = automation.set_product_field(
+            args.repository,
+            args.issue_number,
+            args.org,
+            args.config,
+            field_name=args.field_name,
+            project_numbers=project_numbers
+        )
+        sys.exit(0 if success else 1)
+
+    elif args.action == "add-to-build-project":
         if not args.label:
             print("❌ --label is required for add-to-build-project action", file=sys.stderr)
             sys.exit(1)
@@ -667,11 +1083,12 @@ def main():
             args.issue_number,
             args.org,
             args.label,
-            set_sprint_if_backlog=args.set_sprint_if_backlog
+            set_sprint_if_backlog=args.set_sprint_if_backlog,
+            config_path=args.config
         )
         sys.exit(0 if success else 1)
 
-    else:
+    else:  # add-to-sprint / remove-from-sprint
         action = "add" if args.action == "add-to-sprint" else "remove"
         success_count = automation.process_sprint_for_build_labels(
             args.repository,

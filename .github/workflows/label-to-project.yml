@@ -36,6 +36,7 @@ jobs:
           repository: NASA-PDS/.github
           sparse-checkout: |
             .github/scripts
+            conf
           sparse-checkout-cone-mode: false
 
       - name: Process build label
@@ -46,15 +47,25 @@ jobs:
           # Extract org from repository
           org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
 
-          # Run Python automation script
+          # Add to build project and set project-level Product field
           # --set-sprint-if-backlog: also set current sprint if sprint-backlog is already on the issue
+          # --config: also set the Product single-select field on the project item
           python3 .github/scripts/project_automation.py \
             add-to-build-project \
             --repository "${{ inputs.repository }}" \
             --issue-number ${{ inputs.issue_number }} \
             --org "$org" \
             --label "${{ inputs.label_name }}" \
-            --set-sprint-if-backlog
+            --set-sprint-if-backlog \
+            --config conf/pds-products.yaml
+
+          # Also set org-level Product field (org fields cannot be used for project grouping)
+          python3 .github/scripts/project_automation.py \
+            set-product-field \
+            --repository "${{ inputs.repository }}" \
+            --issue-number ${{ inputs.issue_number }} \
+            --org "$org" \
+            --config conf/pds-products.yaml || true
 
       - name: Add to sprint when sprint-backlog label added
         if: inputs.action == 'labeled' && inputs.label_name == 'sprint-backlog'

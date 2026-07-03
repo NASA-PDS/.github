@@ -32,6 +32,7 @@ jobs:
           repository: NASA-PDS/.github
           sparse-checkout: |
             .github/scripts
+            conf
           sparse-checkout-cone-mode: false
 
       - name: Add to projects
@@ -86,6 +87,22 @@ jobs:
           echo ""
           echo "✅ All done!"
 
+      - name: Set Product field
+        env:
+          GH_TOKEN: ${{ secrets.gh_token }}
+          REPOSITORY: ${{ inputs.repository }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          PROJECT_NUMBERS: ${{ inputs.project_numbers }}
+        run: |
+          org=$(echo "$REPOSITORY" | cut -d'/' -f1)
+          python3 .github/scripts/project_automation.py \
+            set-product-field \
+            --repository "$REPOSITORY" \
+            --issue-number "$ISSUE_NUMBER" \
+            --org "$org" \
+            --config "conf/pds-products.yaml" \
+            --project-numbers "$PROJECT_NUMBERS" || true
+
       - name: Process build labels
         env:
           GH_TOKEN: ${{ secrets.gh_token }}
@@ -114,12 +131,14 @@ jobs:
             echo "Processing build label: $label"
 
             # Run Python automation script for each label
+            # --config: also sets the Product single-select field on the project item
             python3 .github/scripts/project_automation.py \
               add-to-build-project \
               --repository "${{ inputs.repository }}" \
               --issue-number ${{ inputs.issue_number }} \
               --org "$org" \
-              --label "$label"
+              --label "$label" \
+              --config conf/pds-products.yaml
 
             echo ""
           done <<< "$build_labels"
