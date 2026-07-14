@@ -179,14 +179,13 @@ products:
     core_backbone_justification: "Critical cloud infrastructure and platform services"
     repositories:
       - planetary-data-cloud
-      - pds-mcp-infra
+      - pdc-cds-infra
       - pds-tf-modules
       - pds-thin-egress-app
       - proxycrypt
       - cloud-tools
       - cosmo-sign
       - notification-service
-      - pds-cds-infra
       - portal-infra
 
   nucleus:
