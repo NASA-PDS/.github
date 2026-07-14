@@ -219,7 +219,6 @@ products:
     core_backbone_justification: "Operational tooling and monitoring for cloud services"
     repositories:
       - cloud-ops
-      - PlanetPatrol
       - monitoring
 
   operations:
@@ -271,8 +270,14 @@ products:
       - pds3-product-tools
       - mi-label
 
+  ops:
+    description: "Ops noise we do not need in our reporting."
+    ignore: true
+    repositories:
+      - PlanetPatrol
+
   dependencies:
-    description: "External dependencies and forked repositories maintained by PDS"
+    description: "External dependencies and forked repositories not maintained by PDS EN"
     ignore: true
     repositories:
       - FFmpeg
