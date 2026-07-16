@@ -1,0 +1,58 @@
+name: Software Deployment Memo
+description: "Memo for software deployment"
+labels: "i&t.skip,release/deployment,task"
+type: "Task"
+projects: "NASA-PDS/6"
+
+body:
+  - type: textarea
+    id: component
+    attributes:
+      label: 🔨 Component
+      description: PDS System Component
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 💡 Description
+      description: High-level description of the release.
+      placeholder: |
+        e.g. This deployment memo captures configuration steps required for a deployment of the PDS Data Upload Manager (DUM) application version 2.1.2 within the MCP AWS Test/Prod environments.
+        These updates are required for the DUM client script to communicate successfully with the DUM API Gateway instance, as well as the DUM Lambda service function.
+        This memo also details any updates required on the client side when installing or upgrading the pds-ingress-client script to v2.1.2.
+    validations:
+      required: true
+
+  - type: textarea
+    id: aws
+    attributes:
+      label: ☁️ Applicable AWS Services
+      description: Detailed description of changes to the environment or the AWS components.
+      placeholder: |
+        e.g.
+          - S3
+          - EC2
+          - Lambda
+    validations:
+      required: true
+
+  - type: textarea
+    id: client
+    attributes:
+      label: 👷 Client Side Changes
+      description: Detailed description of changes to the client side.
+      placeholder: Link to release notes and/or provide bulleted list of changes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: deployment
+    attributes:
+      label: 🚀 Deployment Procedure
+      description: Detailed description of the deployment procedure.
+      placeholder: Link to documentation or provide bulleted list of steps.
+    validations:
+      required: true
+
