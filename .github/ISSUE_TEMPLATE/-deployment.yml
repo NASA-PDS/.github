@@ -1,4 +1,4 @@
-name: Software Deployment Memo
+name: [internal] Software Deployment Memo
 description: "Memo for software deployment"
 labels: "i&t.skip,release/deployment,task"
 type: "Task"
