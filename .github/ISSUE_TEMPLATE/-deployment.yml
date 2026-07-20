@@ -1,6 +1,6 @@
-name: "[internal] Software Deployment Memo"
+name: "[internal] Deployment Memo"
 description: "Memo for software deployment"
-labels: "i&t.skip,release/deployment,task"
+labels: "i&t.skip,deployment,task"
 type: "Task"
 projects: "NASA-PDS/6"
 
