@@ -60,15 +60,15 @@ jobs:
           TODAY=$(date -u '+%Y-%m-%d')
           NOW=$(date -u '+%s')
 
-          # Format each PR as a multi-line entry with rich metadata
+          # Format each PR using Slack mrkdwn link syntax for clickable links
           jq -r --argjson now "$NOW" '
             . as $pr |
-            ($now - ($pr.updatedAt | sub("\\.[0-9]+Z$"; "Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) / 86400 | floor as $days |
+            ($now - ($pr.createdAt | sub("\\.[0-9]+Z$"; "Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) / 86400 | floor as $days |
             ($pr.labels.nodes | map(.name) | if length > 0 then " [" + join(", ") + "]" else "" end) as $labels |
             ($pr.reviewDecision // "NO_REVIEWS") as $review |
             ($pr.assignees.nodes | map(.login) | if length > 0 then join(", ") else "unassigned" end) as $assignees |
-            "• [\($pr.repository.nameWithOwner)] #\($pr.number) — \($pr.title)\($labels)",
-            "  \($days)d stale | \($review) | \($assignees) | \($pr.url)",
+            "• <\($pr.url)|\($pr.repository.nameWithOwner) #\($pr.number) — \($pr.title)\($labels)>",
+            "  \($days)d old | \($review) | \($assignees)",
             ""
           ' stale_prs.json > pr_lines.txt
 
