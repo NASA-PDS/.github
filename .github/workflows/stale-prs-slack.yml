@@ -67,8 +67,9 @@ jobs:
             ($pr.labels.nodes | map(.name) | if length > 0 then " [" + join(", ") + "]" else "" end) as $labels |
             ($pr.reviewDecision // "NO_REVIEWS") as $review |
             ($pr.assignees.nodes | map(.login) | if length > 0 then join(", ") else "unassigned" end) as $assignees |
-            "• <\($pr.url)|\($pr.repository.nameWithOwner) #\($pr.number) — \($pr.title)\($labels)>",
+            "• \($pr.repository.nameWithOwner) #\($pr.number) — \($pr.title)\($labels)",
             "  \($days)d old | \($review) | \($assignees)",
+            "  \($pr.url)",
             ""
           ' stale_prs.json > pr_lines.txt
 
