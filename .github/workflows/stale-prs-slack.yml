@@ -50,7 +50,7 @@ jobs:
       - name: Build and send Slack message
         if: steps.stale.outputs.count != '0'
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WORKFLOW_WEBHOOK_URL: ${{ secrets.SLACK_WORKFLOW_WEBHOOK_URL }}
           COUNT: ${{ steps.stale.outputs.count }}
         run: |
           TODAY=$(date -u '+%Y-%m-%d')
@@ -64,5 +64,10 @@ jobs:
             MESSAGE="${MESSAGE:0:2900}... and more. See https://github.com/orgs/NASA-PDS/projects for full list."
           fi
 
+          if [ -z "$SLACK_WORKFLOW_WEBHOOK_URL" ]; then
+            echo "SLACK_WORKFLOW_WEBHOOK_URL secret is not set — skipping notification"
+            exit 0
+          fi
+
           jq -n --arg text "$MESSAGE" '{"message_text": $text}' > payload.json
-          curl -s -X POST "$SLACK_WEBHOOK_URL" -H 'Content-Type: application/json' -d @payload.json
+          curl -s -f -X POST "$SLACK_WORKFLOW_WEBHOOK_URL" -H 'Content-Type: application/json' -d @payload.json
