@@ -67,9 +67,8 @@ jobs:
             ($pr.labels.nodes | map(.name) | if length > 0 then " [" + join(", ") + "]" else "" end) as $labels |
             ($pr.reviewDecision // "NO_REVIEWS") as $review |
             ($pr.assignees.nodes | map(.login) | if length > 0 then join(", ") else "unassigned" end) as $assignees |
-            "• \($pr.repository.nameWithOwner) #\($pr.number) — \($pr.title)\($labels)",
+            "• <\($pr.url)|\($pr.repository.nameWithOwner) #\($pr.number) — \($pr.title)\($labels)>",
             "  \($days)d old | \($review) | \($assignees)",
-            "  \($pr.url)",
             ""
           ' stale_prs.json > pr_lines.txt
 
@@ -89,7 +88,7 @@ jobs:
             exit 0
           fi
 
-          jq -n --rawfile text message.txt '{"message_text": $text}' > payload.json
+          jq -n --rawfile text message.txt '{"text": $text}' > payload.json
           curl -s -f -X POST "$SLACK_WORKFLOW_WEBHOOK_URL" \
             -H 'Content-Type: application/json' \
             -d @payload.json
