@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Find stale PRs (>3 days, non-Dependabot)
+      - name: Find open PRs (>3 days old, non-Dependabot)
         id: stale
         env:
           GH_TOKEN: ${{ secrets.ADMIN_GITHUB_TOKEN }}
@@ -23,7 +23,7 @@ jobs:
           gh api graphql --paginate -f query='
             query($endCursor: String) {
               search(
-                query: "org:NASA-PDS is:pr is:open draft:false -author:app/dependabot updated:<'"$CUTOFF"'"
+                query: "org:NASA-PDS is:pr is:open draft:false -author:app/dependabot created:<'"$CUTOFF"'"
                 type: ISSUE
                 first: 100
                 after: $endCursor
@@ -74,7 +74,7 @@ jobs:
 
           {
             printf '🌵 Tumbleweeds Report — %s\n' "$TODAY"
-            printf '%s stale PR(s) with no activity for 3+ days:\n\n' "$COUNT"
+            printf '%s open PR(s) created more than 3 days ago:\n\n' "$COUNT"
             cat pr_lines.txt
           } > message.txt
 
