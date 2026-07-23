@@ -1,0 +1,80 @@
+name: Stale PR Slack Notification
+
+on:
+  schedule:
+    # Weekdays at 9am UTC (1am/2am Pacific depending on DST)
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  notify-stale-prs:
+    name: Notify stale PRs via Slack webhook
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Find stale PRs (>3 days, non-Dependabot)
+        id: stale
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_GITHUB_TOKEN }}
+        run: |
+          CUTOFF=$(date -u -d '3 days ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null \
+            || date -u -v-3d '+%Y-%m-%dT%H:%M:%SZ')
+
+          gh api graphql --paginate -f query='
+            query($endCursor: String) {
+              search(
+                query: "org:NASA-PDS is:pr is:open draft:false -author:app/dependabot updated:<'"$CUTOFF"'"
+                type: ISSUE
+                first: 100
+                after: $endCursor
+              ) {
+                pageInfo { hasNextPage endCursor }
+                nodes {
+                  ... on PullRequest {
+                    number
+                    title
+                    url
+                    updatedAt
+                    author { login }
+                    repository { nameWithOwner }
+                    assignees(first: 5) { nodes { login } }
+                  }
+                }
+              }
+            }
+          ' --jq '.data.search.nodes[]' > stale_prs.json
+
+          COUNT=$(jq -s 'length' stale_prs.json)
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Build and send Slack message
+        if: steps.stale.outputs.count != '0'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          TODAY=$(date -u '+%Y-%m-%d')
+
+          # Build PR list lines
+          PR_LINES=$(jq -r '
+            "• [" + .repository.nameWithOwner + "] #" + (.number|tostring) +
+            " - " + .title +
+            " (" + .author.login + ")" +
+            " | " + .url
+          ' stale_prs.json | head -50)
+
+          COUNT=${{ steps.stale.outputs.count }}
+
+          MESSAGE="🌵 *Tumbleweeds Report — ${TODAY}*
+${COUNT} stale PR(s) with no activity for 3+ days:
+
+${PR_LINES}"
+
+          # Truncate if over Slack's ~3000 char limit
+          if [ ${#MESSAGE} -gt 2900 ]; then
+            MESSAGE="${MESSAGE:0:2900}
+... and more. See https://github.com/orgs/NASA-PDS/projects for full list."
+          fi
+
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg text "$MESSAGE" '{"message_text": $text}')"
