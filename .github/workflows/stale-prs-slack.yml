@@ -62,12 +62,10 @@ jobs:
             " | " + .url
           ' stale_prs.json | head -50)
 
-          COUNT=${{ steps.stale.outputs.count }}
+          COUNT="${{ steps.stale.outputs.count }}"
 
-          MESSAGE="🌵 *Tumbleweeds Report — ${TODAY}*
-${COUNT} stale PR(s) with no activity for 3+ days:
-
-${PR_LINES}"
+          MESSAGE=$(printf '🌵 *Tumbleweeds Report — %s*\n%s stale PR(s) with no activity for 3+ days:\n\n%s' \
+            "$TODAY" "$COUNT" "$PR_LINES")
 
           # Truncate if over Slack's ~3000 char limit
           if [ ${#MESSAGE} -gt 2900 ]; then
