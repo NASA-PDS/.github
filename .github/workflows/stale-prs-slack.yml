@@ -51,28 +51,18 @@ jobs:
         if: steps.stale.outputs.count != '0'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          COUNT: ${{ steps.stale.outputs.count }}
         run: |
           TODAY=$(date -u '+%Y-%m-%d')
 
-          # Build PR list lines
-          PR_LINES=$(jq -r '
-            "• [" + .repository.nameWithOwner + "] #" + (.number|tostring) +
-            " - " + .title +
-            " (" + .author.login + ")" +
-            " | " + .url
-          ' stale_prs.json | head -50)
+          PR_LINES=$(jq -r '"• [" + .repository.nameWithOwner + "] #" + (.number|tostring) + " - " + .title + " (" + .author.login + ") | " + .url' stale_prs.json | head -50)
 
-          COUNT="${{ steps.stale.outputs.count }}"
+          HEADER=$(printf '🌵 *Tumbleweeds Report — %s*\n%s stale PR(s) with no activity for 3+ days:\n\n' "$TODAY" "$COUNT")
+          MESSAGE="${HEADER}${PR_LINES}"
 
-          MESSAGE=$(printf '🌵 *Tumbleweeds Report — %s*\n%s stale PR(s) with no activity for 3+ days:\n\n%s' \
-            "$TODAY" "$COUNT" "$PR_LINES")
-
-          # Truncate if over Slack's ~3000 char limit
           if [ ${#MESSAGE} -gt 2900 ]; then
-            MESSAGE="${MESSAGE:0:2900}
-... and more. See https://github.com/orgs/NASA-PDS/projects for full list."
+            MESSAGE="${MESSAGE:0:2900}... and more. See https://github.com/orgs/NASA-PDS/projects for full list."
           fi
 
-          curl -s -X POST "$SLACK_WEBHOOK_URL" \
-            -H 'Content-Type: application/json' \
-            -d "$(jq -n --arg text "$MESSAGE" '{"message_text": $text}')"
+          jq -n --arg text "$MESSAGE" '{"message_text": $text}' > payload.json
+          curl -s -X POST "$SLACK_WEBHOOK_URL" -H 'Content-Type: application/json' -d @payload.json
