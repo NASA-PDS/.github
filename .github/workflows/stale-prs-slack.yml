@@ -35,9 +35,13 @@ jobs:
                     title
                     url
                     updatedAt
+                    createdAt
                     author { login }
                     repository { nameWithOwner }
                     assignees(first: 5) { nodes { login } }
+                    labels(first: 5) { nodes { name } }
+                    reviewDecision
+                    reviews(last: 1) { nodes { state author { login } } }
                   }
                 }
               }
@@ -54,14 +58,29 @@ jobs:
           COUNT: ${{ steps.stale.outputs.count }}
         run: |
           TODAY=$(date -u '+%Y-%m-%d')
+          NOW=$(date -u '+%s')
 
-          PR_LINES=$(jq -r '"• [" + .repository.nameWithOwner + "] #" + (.number|tostring) + " - " + .title + " (" + .author.login + ") | " + .url' stale_prs.json | head -50)
+          # Format each PR as a multi-line entry with rich metadata
+          jq -r --argjson now "$NOW" '
+            . as $pr |
+            ($now - ($pr.updatedAt | sub("\\.[0-9]+Z$"; "Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) / 86400 | floor as $days |
+            ($pr.labels.nodes | map(.name) | if length > 0 then " [" + join(", ") + "]" else "" end) as $labels |
+            ($pr.reviewDecision // "NO_REVIEWS") as $review |
+            ($pr.assignees.nodes | map(.login) | if length > 0 then join(", ") else "unassigned" end) as $assignees |
+            "• [\($pr.repository.nameWithOwner)] #\($pr.number) — \($pr.title)\($labels)",
+            "  \($days)d stale | \($review) | \($assignees) | \($pr.url)",
+            ""
+          ' stale_prs.json > pr_lines.txt
 
-          HEADER=$(printf '🌵 *Tumbleweeds Report — %s*\n%s stale PR(s) with no activity for 3+ days:\n\n' "$TODAY" "$COUNT")
-          MESSAGE="${HEADER}${PR_LINES}"
+          {
+            printf '🌵 Tumbleweeds Report — %s\n' "$TODAY"
+            printf '%s stale PR(s) with no activity for 3+ days:\n\n' "$COUNT"
+            cat pr_lines.txt
+          } > message.txt
 
-          if [ ${#MESSAGE} -gt 2900 ]; then
-            MESSAGE="${MESSAGE:0:2900}... and more. See https://github.com/orgs/NASA-PDS/projects for full list."
+          if [ "$(wc -c < message.txt)" -gt 2900 ]; then
+            truncate -s 2900 message.txt
+            printf '\n... and more. See https://github.com/NASA-PDS for full list.' >> message.txt
           fi
 
           if [ -z "$SLACK_WORKFLOW_WEBHOOK_URL" ]; then
@@ -69,5 +88,7 @@ jobs:
             exit 0
           fi
 
-          jq -n --arg text "$MESSAGE" '{"message_text": $text}' > payload.json
-          curl -s -f -X POST "$SLACK_WORKFLOW_WEBHOOK_URL" -H 'Content-Type: application/json' -d @payload.json
+          jq -n --rawfile text message.txt '{"message_text": $text}' > payload.json
+          curl -s -f -X POST "$SLACK_WORKFLOW_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d @payload.json
