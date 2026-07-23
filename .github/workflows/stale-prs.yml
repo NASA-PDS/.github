@@ -1,0 +1,57 @@
+name: PR Review Reminders to Slack
+
+on:
+  schedule:
+    - cron: '0 13 * * 1-5'   # 9am ET on weekdays (13:00 UTC) — adjust for your timezone/DST
+  workflow_dispatch: {}       # lets you trigger it manually to test
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch open PRs across repos
+        id: fetch
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_GITHUB_TOKEN }}
+        run: |
+          # Add/remove repos here (owner/repo), one --repo flag each
+          gh search prs \
+            --state open \
+            --org nasa-pds
+            --json number,title,url,repository,createdAt,author,isDraft \
+            --limit 50 > prs.json
+
+      - name: Format Slack message
+        run: |
+          python3 - <<'EOF'
+          import json, datetime
+
+          with open("prs.json") as f:
+              prs = json.load(f)
+
+          now = datetime.datetime.now(datetime.timezone.utc)
+          lines = ["*Open PRs needing review:*"]
+
+          for pr in prs:
+              if pr.get("isDraft"):
+                  continue
+              created = datetime.datetime.fromisoformat(pr["createdAt"].replace("Z", "+00:00"))
+              age_days = (now - created).days
+              repo = pr["repository"]["name"]
+              author = pr["author"]["login"] if pr.get("author") else "unknown"
+              lines.append(f"• <{pr['url']}|{pr['title']}> — `{repo}` · opened by {author} · {age_days}d old")
+
+          text = "\n".join(lines) if len(lines) > 1 else "✅ No open PRs need review right now."
+
+          with open("message.txt", "w") as f:
+              f.write(text)
+          EOF
+
+      - name: Send to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WORKFLOW_WEBHOOK_URL }}
+        run: |
+          MSG_JSON=$(python3 -c "import json,sys; print(json.dumps(open('message.txt').read()))")
+          curl -sf -X POST -H 'Content-type: application/json' \
+            --data "{\"message_text\": $MSG_JSON}" \
+            "$SLACK_WEBHOOK_URL"
