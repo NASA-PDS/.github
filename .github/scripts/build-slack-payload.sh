@@ -28,12 +28,23 @@ fi
 
 TODAY=$(date -u '+%Y-%m-%d')
 NOW=$(date -u '+%s')
+CUTOFF=$(date -u -d '3 days ago' '+%Y-%m-%d' 2>/dev/null || date -u -v-3d '+%Y-%m-%d')
 IGNORED=$(cat "$IGNORED_FILE")
+
+# When INCLUDE_DEPENDABOT=true, show security-labeled Dependabot PRs.
+# When false (default), suppress all Dependabot PRs.
+if [[ "${INCLUDE_DEPENDABOT:-false}" == "true" ]]; then
+  INCL_DEP=true
+else
+  INCL_DEP=false
+fi
 
 jq -s \
   --arg today "$TODAY" \
   --argjson now "$NOW" \
-  --argjson ignored "$IGNORED" '
+  --argjson ignored "$IGNORED" \
+  --argjson include_dep "$INCL_DEP" \
+  --arg cutoff "$CUTOFF" '
   def days_old(dt):
     ($now - (dt | sub("\\.[0-9]+Z$"; "Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) / 86400 | floor;
   def review_label(r):
@@ -43,15 +54,21 @@ jq -s \
     else "💬 No Reviews" end;
   def label_str(ls):
     if (ls | length) > 0 then " [" + (ls | join(", ")) + "]" else "" end;
-  def assignee_str(a):
-    if (a | length) > 0 then a | join(", ") else "unassigned" end;
-  # True for Dependabot PRs that are NOT security updates — exclude these
-  def is_routine_dependabot:
+  def reviewer_str(a):
+    if (a | length) > 0 then a | join(", ") else "no reviewers" end;
+  # Exclude Dependabot PRs:
+  #   include_dep=false → drop all Dependabot PRs
+  #   include_dep=true  → keep only those labeled "security"
+  def is_excluded_dependabot:
     .author.login == "dependabot[bot]" and
-    (.labels.nodes | map(.name | ascii_downcase) | any(. == "security") | not);
+    (if $include_dep then
+      (.labels.nodes | map(.name | ascii_downcase) | any(. == "security") | not)
+    else
+      true
+    end);
   [.[] |
     select(.repository.nameWithOwner | IN($ignored[]) | not) |
-    select(is_routine_dependabot | not)]
+    select(is_excluded_dependabot | not)]
   | sort_by(.createdAt) as $sorted
   | ($sorted | length) as $total
   | ($sorted | .[:22]) as $shown
@@ -66,12 +83,14 @@ jq -s \
           {"type": "section", "text": {"type": "mrkdwn",
             "text": "*<\($pr.url)|\($pr.repository.nameWithOwner) #\($pr.number) — \($pr.title)\(label_str($pr.labels.nodes | map(.name)))>*"}},
           {"type": "context", "elements": [{"type": "mrkdwn",
-            "text": "\(days_old($pr.createdAt))d old | \(review_label($pr.reviewDecision)) | \(assignee_str($pr.assignees.nodes | map(.login)))"}]}
+            "text": "\(days_old($pr.createdAt))d old | \(review_label($pr.reviewDecision)) | \(reviewer_str($pr.reviewRequests.nodes | map(.requestedReviewer | (.login // .name))))"}]}
         ]) | flatten) +
-        if $total > 22 then
+        (if $total > 22 then
           [{"type": "section", "text": {"type": "mrkdwn",
-            "text": "_...and \($total - 22) more. See <https://github.com/NASA-PDS|NASA-PDS on GitHub>._"}}]
-        else [] end
+            "text": "_...and \($total - 22) more not shown._"}}]
+        else [] end) +
+        [{"type": "section", "text": {"type": "mrkdwn",
+          "text": "<https://github.com/pulls?q=is%3Apr+is%3Aopen+org%3ANASA-PDS|View all open NASA-PDS pull requests →>"}}]
       )
     }
 ' "$STALE_FILE"

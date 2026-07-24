@@ -5,6 +5,11 @@ on:
     # Weekdays at 9am UTC (1am/2am Pacific depending on DST)
     - cron: '0 9 * * 1-5'
   workflow_dispatch:
+    inputs:
+      include_dependabot:
+        description: 'Include Dependabot PRs (security-labeled only). Off by default — volume is too high.'
+        type: boolean
+        default: false
 
 jobs:
   notify-stale-prs:
@@ -54,7 +59,7 @@ jobs:
                     createdAt
                     author { login }
                     repository { nameWithOwner }
-                    assignees(first: 5) { nodes { login } }
+                    reviewRequests(first: 5) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } }
                     labels(first: 5) { nodes { name } }
                     reviewDecision
                   }
@@ -70,6 +75,7 @@ jobs:
         if: steps.stale.outputs.count != '0'
         env:
           SLACK_WORKFLOW_WEBHOOK_URL: ${{ secrets.SLACK_WORKFLOW_WEBHOOK_URL }}
+          INCLUDE_DEPENDABOT: ${{ inputs.include_dependabot || 'false' }}
         run: |
           if [ -z "$SLACK_WORKFLOW_WEBHOOK_URL" ]; then
             echo "SLACK_WORKFLOW_WEBHOOK_URL secret is not set — skipping notification"
