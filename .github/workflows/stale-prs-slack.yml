@@ -34,7 +34,7 @@ jobs:
           print(json.dumps(repos))
           " > ignored_repos.json
 
-      - name: Find open PRs (>3 days old, non-draft; Dependabot security PRs included)
+      - name: Find open PRs (>3 days old, non-draft, non-Dependabot)
         id: stale
         env:
           GH_TOKEN: ${{ secrets.ADMIN_GITHUB_TOKEN }}
