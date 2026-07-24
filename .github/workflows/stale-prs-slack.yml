@@ -2,8 +2,8 @@ name: Stale PR Slack Notification
 
 on:
   schedule:
-    # Weekdays at 9am UTC (1am/2am Pacific depending on DST)
-    - cron: '0 9 * * 1-5'
+    # 8am Pacific Daylight Time (UTC-7); shifts to 7am in winter (PST/UTC-8)
+    - cron: '0 15 * * 1-5'
   workflow_dispatch:
     inputs:
       include_dependabot:
