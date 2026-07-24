@@ -56,11 +56,11 @@ jq -s \
     if (ls | length) > 0 then " [" + (ls | join(", ")) + "]" else "" end;
   def reviewer_str(a):
     if (a | length) > 0 then a | join(", ") else "no reviewers" end;
-  # Exclude Dependabot PRs:
+  # Exclude Dependabot PRs (GraphQL returns login as "dependabot", not "dependabot[bot]"):
   #   include_dep=false → drop all Dependabot PRs
   #   include_dep=true  → keep only those labeled "security"
   def is_excluded_dependabot:
-    .author.login == "dependabot[bot]" and
+    (.author.login == "dependabot" or .author.login == "dependabot[bot]") and
     (if $include_dep then
       (.labels.nodes | map(.name | ascii_downcase) | any(. == "security") | not)
     else
