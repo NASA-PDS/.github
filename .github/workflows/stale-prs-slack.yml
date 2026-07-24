@@ -59,7 +59,7 @@ jobs:
                     createdAt
                     author { login }
                     repository { nameWithOwner }
-                    reviewRequests(first: 5) { nodes { requestedReviewer { ... on User { login } ... on Team { name } } } }
+                    reviewRequests(first: 5) { nodes { requestedReviewer { ... on User { login } } } }
                     labels(first: 5) { nodes { name } }
                     reviewDecision
                   }

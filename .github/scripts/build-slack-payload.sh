@@ -83,7 +83,7 @@ jq -s \
           {"type": "section", "text": {"type": "mrkdwn",
             "text": "*<\($pr.url)|\($pr.repository.nameWithOwner) #\($pr.number) — \($pr.title)\(label_str($pr.labels.nodes | map(.name)))>*"}},
           {"type": "context", "elements": [{"type": "mrkdwn",
-            "text": "\(days_old($pr.createdAt))d old | \(review_label($pr.reviewDecision)) | \(reviewer_str($pr.reviewRequests.nodes | map(.requestedReviewer | (.login // .name))))"}]}
+            "text": "\(days_old($pr.createdAt))d old | \(review_label($pr.reviewDecision)) | \(reviewer_str($pr.reviewRequests.nodes | map(.requestedReviewer.login) | map(select(. != null))))"}]}
         ]) | flatten) +
         (if $total > 22 then
           [{"type": "section", "text": {"type": "mrkdwn",
