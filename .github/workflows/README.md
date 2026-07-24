@@ -28,6 +28,32 @@ These workflows run in the context of the NASA-PDS organization's `.github` repo
 
 ---
 
+### stale-prs-slack.yml
+**Purpose**: Posts a "Tumbleweeds Report" of stale open PRs to Slack each weekday morning
+
+**Type**: Org-wide scheduled workflow
+
+**Trigger**:
+- Scheduled: Weekdays at 15:00 UTC (8am Pacific)
+- Manual: workflow_dispatch (with optional `include_dependabot` boolean input)
+
+**What it does**:
+1. Extracts ignored repos from `conf/pds-products.yaml`
+2. Fetches all open, non-draft PRs in the NASA-PDS org created more than 3 days ago via `fetch-stale-prs.sh`
+3. Builds a Slack Block Kit payload via `build-slack-payload.sh` — one compact context block per PR showing title (linked), age, review status, and reviewers
+4. POSTs the payload to the configured Slack webhook
+
+**Required secret**: `SLACK_WORKFLOW_WEBHOOK_URL` — Incoming Webhook URL from the **PDS Tumbleweeds App** in the NASA-PDS Slack workspace
+
+**Slack app setup**: See [`.github/scripts/README.md`](../scripts/README.md#slack-app-setup) for how the Slack app was created and how to change the target channel.
+
+**Manual trigger**:
+```bash
+gh workflow run stale-prs-slack.yml --repo NASA-PDS/.github
+```
+
+---
+
 ## Reusable Workflow Templates
 
 These workflows are designed to be called from other repositories using `workflow_call`. They provide standardized project management automation that can be adopted by any NASA-PDS repository.
