@@ -39,6 +39,9 @@ query($endCursor: String) {
         reviewRequests(first: 5) {
           nodes { requestedReviewer { ... on User { login } } }
         }
+        latestReviews(first: 10) {
+          nodes { author { login } state }
+        }
         labels(first: 5) { nodes { name } }
         reviewDecision
       }

@@ -56,6 +56,10 @@ jq -s \
     if (ls | length) > 0 then " [" + (ls | join(", ")) + "]" else "" end;
   def reviewer_str(a):
     if (a | length) > 0 then a | join(", ") else "no reviewers" end;
+  def all_reviewers(pr):
+    ((pr.reviewRequests.nodes | map(.requestedReviewer.login) | map(select(. != null))) +
+     (pr.latestReviews.nodes | map(.author.login) | map(select(. != null))))
+    | unique;
   # Exclude Dependabot PRs (GraphQL returns login as "dependabot", not "dependabot[bot]"):
   #   include_dep=false → drop all Dependabot PRs
   #   include_dep=true  → keep only those labeled "security"
@@ -71,7 +75,7 @@ jq -s \
     select(is_excluded_dependabot | not)]
   | sort_by(.createdAt) as $sorted
   | ($sorted | length) as $total
-  | ($sorted | .[:22]) as $shown
+  | ($sorted | .[:40]) as $shown
   | {
       "blocks": (
         [
@@ -79,18 +83,22 @@ jq -s \
           {"type": "context", "elements": [{"type": "mrkdwn", "text": "\($total) open PR(s) created more than 3 days ago"}]},
           {"type": "divider"}
         ] +
-        ($shown | map(. as $pr | [
-          {"type": "section", "text": {"type": "mrkdwn",
-            "text": "*<\($pr.url)|\($pr.repository.nameWithOwner) #\($pr.number) — \($pr.title)\(label_str($pr.labels.nodes | map(.name)))>*"}},
-          {"type": "context", "elements": [{"type": "mrkdwn",
-            "text": "\(days_old($pr.createdAt))d old | \(review_label($pr.reviewDecision)) | \(reviewer_str($pr.reviewRequests.nodes | map(.requestedReviewer.login) | map(select(. != null))))"}]}
-        ]) | flatten) +
-        (if $total > 22 then
-          [{"type": "section", "text": {"type": "mrkdwn",
-            "text": "_...and \($total - 22) more not shown._"}}]
+        # One context block per PR: title link on first element, metadata on second.
+        # context blocks render compactly with guaranteed link support.
+        ($shown | map(. as $pr | {
+          "type": "context",
+          "elements": [
+            {"type": "mrkdwn", "text": "*<\($pr.url)|\($pr.repository.nameWithOwner) #\($pr.number) — \($pr.title)\(label_str($pr.labels.nodes | map(.name)))>*"},
+            {"type": "mrkdwn", "text": "\(days_old($pr.createdAt))d old  ·  \(review_label($pr.reviewDecision))  ·  \(reviewer_str(all_reviewers($pr)))"}
+          ]
+        })) +
+        (if $total > 40 then
+          [{"type": "context", "elements": [{"type": "mrkdwn",
+            "text": "_...and \($total - 40) more not shown._"}]}]
         else [] end) +
-        [{"type": "section", "text": {"type": "mrkdwn",
-          "text": "<https://github.com/pulls?q=is%3Apr+is%3Aopen+org%3ANASA-PDS|View all open NASA-PDS pull requests →>"}}]
+        [{"type": "divider"},
+         {"type": "context", "elements": [{"type": "mrkdwn",
+          "text": "<https://github.com/pulls?q=is%3Apr+is%3Aopen+org%3ANASA-PDS|View all open NASA-PDS pull requests →>"}]}]
       )
     }
 ' "$STALE_FILE"
