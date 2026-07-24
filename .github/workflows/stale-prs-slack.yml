@@ -42,31 +42,38 @@ jobs:
           CUTOFF=$(date -u -d '3 days ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null \
             || date -u -v-3d '+%Y-%m-%dT%H:%M:%SZ')
 
-          gh api graphql --paginate -f query='
-            query($endCursor: String) {
-              search(
-                query: "org:NASA-PDS is:pr is:open draft:false created:<'"$CUTOFF"'"
-                type: ISSUE
-                first: 100
-                after: $endCursor
-              ) {
-                pageInfo { hasNextPage endCursor }
-                nodes {
-                  ... on PullRequest {
-                    number
-                    title
-                    url
-                    createdAt
-                    author { login }
-                    repository { nameWithOwner }
-                    reviewRequests(first: 5) { nodes { requestedReviewer { ... on User { login } } } }
-                    labels(first: 5) { nodes { name } }
-                    reviewDecision
-                  }
+          # Build the query in a heredoc so < is unambiguously literal
+          # and ${CUTOFF} expands cleanly. \$endCursor escapes the $ so
+          # the shell doesn't expand it — gh receives a literal $endCursor.
+          GQL=$(cat << GRAPHQL
+          query(\$endCursor: String) {
+            search(
+              query: "org:NASA-PDS is:pr is:open draft:false created:<${CUTOFF}"
+              type: ISSUE
+              first: 100
+              after: \$endCursor
+            ) {
+              pageInfo { hasNextPage endCursor }
+              nodes {
+                ... on PullRequest {
+                  number
+                  title
+                  url
+                  createdAt
+                  author { login }
+                  repository { nameWithOwner }
+                  reviewRequests(first: 5) { nodes { requestedReviewer { ... on User { login } } } }
+                  labels(first: 5) { nodes { name } }
+                  reviewDecision
                 }
               }
             }
-          ' --jq '.data.search.nodes[]' > stale_prs.json
+          }
+          GRAPHQL
+          )
+
+          gh api graphql --paginate -f query="$GQL" \
+            --jq '.data.search.nodes[]' > stale_prs.json
 
           COUNT=$(jq -s 'length' stale_prs.json)
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
