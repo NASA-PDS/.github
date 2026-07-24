@@ -57,38 +57,48 @@ jobs:
           SLACK_WORKFLOW_WEBHOOK_URL: ${{ secrets.SLACK_WORKFLOW_WEBHOOK_URL }}
           COUNT: ${{ steps.stale.outputs.count }}
         run: |
-          TODAY=$(date -u '+%Y-%m-%d')
-          NOW=$(date -u '+%s')
-
-          # Format each PR using Slack mrkdwn link syntax for clickable links
-          jq -r --argjson now "$NOW" '
-            . as $pr |
-            ($now - ($pr.createdAt | sub("\\.[0-9]+Z$"; "Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) / 86400 | floor as $days |
-            ($pr.labels.nodes | map(.name) | if length > 0 then " [" + join(", ") + "]" else "" end) as $labels |
-            ($pr.reviewDecision // "NO_REVIEWS") as $review |
-            ($pr.assignees.nodes | map(.login) | if length > 0 then join(", ") else "unassigned" end) as $assignees |
-            "• <\($pr.url)|\($pr.repository.nameWithOwner) #\($pr.number) — \($pr.title)\($labels)>",
-            "  \($days)d old | \($review) | \($assignees)",
-            ""
-          ' stale_prs.json > pr_lines.txt
-
-          {
-            printf '🌵 Tumbleweeds Report — %s\n' "$TODAY"
-            printf '%s open PR(s) created more than 3 days ago:\n\n' "$COUNT"
-            cat pr_lines.txt
-          } > message.txt
-
-          if [ "$(wc -c < message.txt)" -gt 2900 ]; then
-            truncate -s 2900 message.txt
-            printf '\n... and more. See https://github.com/NASA-PDS for full list.' >> message.txt
-          fi
-
           if [ -z "$SLACK_WORKFLOW_WEBHOOK_URL" ]; then
             echo "SLACK_WORKFLOW_WEBHOOK_URL secret is not set — skipping notification"
             exit 0
           fi
 
-          jq -n --rawfile text message.txt '{"text": $text}' > payload.json
+          TODAY=$(date -u '+%Y-%m-%d')
+          NOW=$(date -u '+%s')
+
+          # Build Slack Block Kit payload — max 22 PRs to stay under 50-block limit
+          jq -s --arg today "$TODAY" --arg count "$COUNT" --argjson now "$NOW" '
+            def days_old(dt):
+              ($now - (dt | sub("\\.[0-9]+Z$"; "Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) / 86400 | floor;
+            def review_label(r):
+              if r == "APPROVED" then "✅ Approved"
+              elif r == "CHANGES_REQUESTED" then "🔴 Changes Requested"
+              elif r == "REVIEW_REQUIRED" then "👀 Review Required"
+              else "💬 No Reviews" end;
+            def label_str(ls):
+              if (ls | length) > 0 then " [" + (ls | join(", ")) + "]" else "" end;
+            def assignee_str(as):
+              if (as | length) > 0 then as | join(", ") else "unassigned" end;
+            sort_by(.createdAt) as $sorted |
+            ($sorted | length) as $total |
+            ($sorted | .[:22]) as $shown |
+            [
+              {"type": "header", "text": {"type": "plain_text", "text": "🌵 Tumbleweeds Report — \($today)", "emoji": true}},
+              {"type": "context", "elements": [{"type": "mrkdwn", "text": "\($count) open PR(s) created more than 3 days ago"}]},
+              {"type": "divider"}
+            ] +
+            ($shown | map(. as $pr | [
+              {"type": "section", "text": {"type": "mrkdwn",
+                "text": "*<\($pr.url)|\($pr.repository.nameWithOwner) #\($pr.number) — \($pr.title)\(label_str($pr.labels.nodes | map(.name)))>*"}},
+              {"type": "context", "elements": [{"type": "mrkdwn",
+                "text": "\(days_old($pr.createdAt))d old | \(review_label($pr.reviewDecision)) | \(assignee_str($pr.assignees.nodes | map(.login)))"}]}
+            ]) | flatten) +
+            if $total > 22 then
+              [{"type": "section", "text": {"type": "mrkdwn",
+                "text": "_...and \($total - 22) more. See <https://github.com/NASA-PDS|NASA-PDS on GitHub>._"}}]
+            else [] end
+          ' stale_prs.json > blocks.json
+
+          jq -n --slurpfile blocks blocks.json '{"blocks": $blocks[0]}' > payload.json
           curl -s -f -X POST "$SLACK_WORKFLOW_WEBHOOK_URL" \
             -H 'Content-Type: application/json' \
             -d @payload.json
