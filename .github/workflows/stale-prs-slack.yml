@@ -15,9 +15,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Extract ignored repos from pds-products.yaml
-        id: ignored
         run: |
-          REPOS=$(python3 -c "
+          python3 -c "
           import yaml, json
           with open('conf/pds-products.yaml') as f:
               data = yaml.safe_load(f)
@@ -28,8 +27,7 @@ jobs:
               for r in p.get('repositories', [])
           ]
           print(json.dumps(repos))
-          ")
-          echo "repos=$REPOS" >> "$GITHUB_OUTPUT"
+          " > ignored_repos.json
 
       - name: Find open PRs (>3 days old, non-draft; Dependabot security PRs included)
         id: stale
@@ -72,58 +70,14 @@ jobs:
         if: steps.stale.outputs.count != '0'
         env:
           SLACK_WORKFLOW_WEBHOOK_URL: ${{ secrets.SLACK_WORKFLOW_WEBHOOK_URL }}
-          IGNORED_REPOS: ${{ steps.ignored.outputs.repos }}
         run: |
           if [ -z "$SLACK_WORKFLOW_WEBHOOK_URL" ]; then
             echo "SLACK_WORKFLOW_WEBHOOK_URL secret is not set — skipping notification"
             exit 0
           fi
 
-          TODAY=$(date -u '+%Y-%m-%d')
-          NOW=$(date -u '+%s')
+          .github/scripts/build-slack-payload.sh stale_prs.json ignored_repos.json > payload.json
 
-          # Build Slack Block Kit payload — max 22 PRs to stay under 50-block limit
-          # Filters: ignored repos (pds-products.yaml), non-security Dependabot PRs
-          jq -s --arg today "$TODAY" --argjson now "$NOW" --argjson ignored "$IGNORED_REPOS" '
-            def days_old(dt):
-              ($now - (dt | sub("\\.[0-9]+Z$"; "Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) / 86400 | floor;
-            def review_label(r):
-              if r == "APPROVED" then "✅ Approved"
-              elif r == "CHANGES_REQUESTED" then "🔴 Changes Requested"
-              elif r == "REVIEW_REQUIRED" then "👀 Review Required"
-              else "💬 No Reviews" end;
-            def label_str(ls):
-              if (ls | length) > 0 then " [" + (ls | join(", ")) + "]" else "" end;
-            def assignee_str(as):
-              if (as | length) > 0 then as | join(", ") else "unassigned" end;
-            # True for Dependabot PRs that are NOT security updates — exclude these
-            def is_routine_dependabot:
-              .author.login == "dependabot[bot]" and
-              (.labels.nodes | map(.name | ascii_downcase) | any(. == "security") | not);
-            [.[] |
-              select(.repository.nameWithOwner | IN($ignored[]) | not) |
-              select(is_routine_dependabot | not)]
-            | sort_by(.createdAt) as $sorted
-            | ($sorted | length) as $total
-            | ($sorted | .[:22]) as $shown
-            | [
-                {"type": "header", "text": {"type": "plain_text", "text": "🌵 Tumbleweeds Report — \($today)", "emoji": true}},
-                {"type": "context", "elements": [{"type": "mrkdwn", "text": "\($total) open PR(s) created more than 3 days ago"}]},
-                {"type": "divider"}
-              ] +
-              ($shown | map(. as $pr | [
-                {"type": "section", "text": {"type": "mrkdwn",
-                  "text": "*<\($pr.url)|\($pr.repository.nameWithOwner) #\($pr.number) — \($pr.title)\(label_str($pr.labels.nodes | map(.name)))>*"}},
-                {"type": "context", "elements": [{"type": "mrkdwn",
-                  "text": "\(days_old($pr.createdAt))d old | \(review_label($pr.reviewDecision)) | \(assignee_str($pr.assignees.nodes | map(.login)))"}]}
-              ]) | flatten) +
-              if $total > 22 then
-                [{"type": "section", "text": {"type": "mrkdwn",
-                  "text": "_...and \($total - 22) more. See <https://github.com/NASA-PDS|NASA-PDS on GitHub>._"}}]
-              else [] end
-          ' stale_prs.json > blocks.json
-
-          jq -n --slurpfile blocks blocks.json '{"blocks": $blocks[0]}' > payload.json
           curl -s -f -X POST "$SLACK_WORKFLOW_WEBHOOK_URL" \
             -H 'Content-Type: application/json' \
             -d @payload.json
