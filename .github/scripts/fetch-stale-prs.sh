@@ -56,19 +56,33 @@ GQL="${GQL/__CUTOFF__/$CUTOFF}"
 TMPFILE=$(mktemp)
 trap 'rm -f "$TMPFILE"' EXIT
 
-# --paginate without --jq: gh writes one raw JSON envelope per page to stdout.
-# We then extract nodes with a separate jq pass so a mid-pagination API error
-# (which gh writes as plain text / HTML) is caught cleanly.
-if ! gh api graphql --paginate -f query="$GQL" > "$TMPFILE" 2>&1; then
-  echo "Error: gh api graphql failed:" >&2
-  cat "$TMPFILE" >&2
-  exit 1
-fi
+# Retry wrapper: up to MAX_ATTEMPTS with exponential backoff.
+# Retries on non-zero exit or a non-JSON (e.g. HTML 502) response body.
+MAX_ATTEMPTS=4
+BACKOFF=5
+for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+  gh api graphql --paginate -f query="$GQL" > "$TMPFILE" 2>&1
+  GH_EXIT=$?
 
-# Validate the first byte is '{' — guards against HTML error pages
-if ! head -c1 "$TMPFILE" | grep -q '{'; then
-  echo "Error: unexpected non-JSON response from gh api graphql:" >&2
-  head -5 "$TMPFILE" >&2
+  if [ "$GH_EXIT" -ne 0 ]; then
+    echo "Attempt $attempt/$MAX_ATTEMPTS: gh api graphql exited $GH_EXIT" >&2
+  elif ! head -c1 "$TMPFILE" | grep -q '{'; then
+    echo "Attempt $attempt/$MAX_ATTEMPTS: unexpected non-JSON response" >&2
+    GH_EXIT=1
+  else
+    break
+  fi
+
+  if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+    echo "Retrying in ${BACKOFF}s..." >&2
+    sleep "$BACKOFF"
+    BACKOFF=$(( BACKOFF * 2 ))
+  fi
+done
+
+if [ "$GH_EXIT" -ne 0 ]; then
+  echo "Error: gh api graphql failed after $MAX_ATTEMPTS attempts:" >&2
+  cat "$TMPFILE" >&2
   exit 1
 fi
 
