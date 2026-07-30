@@ -58,18 +58,24 @@ trap 'rm -f "$TMPFILE"' EXIT
 
 # Retry wrapper: up to MAX_ATTEMPTS with exponential backoff.
 # Retries on non-zero exit or a non-JSON (e.g. HTML 502) response body.
+# Note: 'gh' is called with '|| true' so set -e doesn't fire mid-loop;
+# GH_EXIT is checked explicitly instead.
 MAX_ATTEMPTS=4
 BACKOFF=5
+GH_EXIT=0
 for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
-  gh api graphql --paginate -f query="$GQL" > "$TMPFILE" 2>&1
-  GH_EXIT=$?
+  echo "Attempt $attempt/$MAX_ATTEMPTS: calling gh api graphql..." >&2
+  gh api graphql --paginate -f query="$GQL" > "$TMPFILE" 2>&1 || GH_EXIT=$?
 
   if [ "$GH_EXIT" -ne 0 ]; then
-    echo "Attempt $attempt/$MAX_ATTEMPTS: gh api graphql exited $GH_EXIT" >&2
+    echo "Attempt $attempt/$MAX_ATTEMPTS: gh exited $GH_EXIT — response body:" >&2
+    cat "$TMPFILE" >&2
   elif ! head -c1 "$TMPFILE" | grep -q '{'; then
-    echo "Attempt $attempt/$MAX_ATTEMPTS: unexpected non-JSON response" >&2
+    echo "Attempt $attempt/$MAX_ATTEMPTS: non-JSON response (expected '{'), body:" >&2
+    head -10 "$TMPFILE" >&2
     GH_EXIT=1
   else
+    echo "Attempt $attempt/$MAX_ATTEMPTS: success" >&2
     break
   fi
 
@@ -77,12 +83,12 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
     echo "Retrying in ${BACKOFF}s..." >&2
     sleep "$BACKOFF"
     BACKOFF=$(( BACKOFF * 2 ))
+    GH_EXIT=0
   fi
 done
 
 if [ "$GH_EXIT" -ne 0 ]; then
-  echo "Error: gh api graphql failed after $MAX_ATTEMPTS attempts:" >&2
-  cat "$TMPFILE" >&2
+  echo "Error: gh api graphql failed after $MAX_ATTEMPTS attempts — giving up" >&2
   exit 1
 fi
 
