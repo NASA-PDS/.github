@@ -31,7 +31,7 @@ jobs:
       with:
         owner: NASA-PDS
         number: 25
-        token: ${{ secrets.ORG_PROJECT_PAT }}
+        token: ${{ secrets.ADMIN_GITHUB_TOKEN }}
         iteration-field: sprint
         iteration: last
         new-iteration: current
