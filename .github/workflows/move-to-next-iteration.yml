@@ -18,7 +18,7 @@ jobs:
     - name: Keepalive — prevent GitHub from disabling this scheduled workflow
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.ADMIN_GITHUB_TOKEN }}
 
     - name: Push empty commit to reset inactivity timer
       run: |
