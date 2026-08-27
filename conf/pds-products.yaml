@@ -136,7 +136,6 @@ products:
       - portal
       - portal-legacy
       - portal-legacy-docker
-      - portal-drupal
       - portal-tasks
       - portal-wp
       - nasa-pds.github.io
@@ -170,6 +169,7 @@ products:
       - Drupal-Temp
       - search-ui-legacy
       - portal-search-ui-legacy
+      - portal-drupal
 
   cloud-platform-engineering:
     description: "Planetary Data Cloud platform infrastructure and engineering"
