@@ -136,8 +136,6 @@ products:
       - portal
       - portal-legacy
       - portal-legacy-docker
-      - portal-tasks
-      - portal-wp
       - nasa-pds.github.io
       - planetarydata.org
       - pds-web-mgmt
@@ -148,11 +146,8 @@ products:
     github_project_name: "Web Design"
     work_stream: "web-modernization"
     repositories:
-      - wds
-      - wds-react
       - wds-react-legacy
       - wds-web
-      - portal-wp-tasks
 
   web-dev:
     description: "Web development tools and demonstration applications"
@@ -165,8 +160,6 @@ products:
       - s3-browser-cloudfront
       - gis-web-client
       - api-subpath
-      - portal-wst-docker-drupal
-      - Drupal-Temp
       - search-ui-legacy
       - portal-search-ui-legacy
       - portal-drupal
@@ -317,7 +310,6 @@ products:
       - pds-api-pythonlib
       - pds-api-service
       - api-search-query-lexer
-      - portal-wp-smd
       - planetary-data-login
       - pds4-migrate-tools
       - pds4-npm-utils
