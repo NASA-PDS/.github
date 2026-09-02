@@ -64,14 +64,19 @@ MAX_ATTEMPTS=4
 BACKOFF=5
 GH_EXIT=0
 for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+  GH_EXIT=0
   echo "Attempt $attempt/$MAX_ATTEMPTS: calling gh api graphql..." >&2
   gh api graphql --paginate -f query="$GQL" > "$TMPFILE" 2>&1 || GH_EXIT=$?
 
   if [ "$GH_EXIT" -ne 0 ]; then
     echo "Attempt $attempt/$MAX_ATTEMPTS: gh exited $GH_EXIT — response body:" >&2
     cat "$TMPFILE" >&2
-  elif ! head -c1 "$TMPFILE" | grep -q '{'; then
+  elif ! head -c1 "$TMPFILE" | grep -q '^{$\|^{'; then
     echo "Attempt $attempt/$MAX_ATTEMPTS: non-JSON response (expected '{'), body:" >&2
+    head -10 "$TMPFILE" >&2
+    GH_EXIT=1
+  elif grep -q '<html' "$TMPFILE" 2>/dev/null; then
+    echo "Attempt $attempt/$MAX_ATTEMPTS: HTML response in output (likely 502), body:" >&2
     head -10 "$TMPFILE" >&2
     GH_EXIT=1
   else
@@ -83,7 +88,6 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
     echo "Retrying in ${BACKOFF}s..." >&2
     sleep "$BACKOFF"
     BACKOFF=$(( BACKOFF * 2 ))
-    GH_EXIT=0
   fi
 done
 
@@ -92,13 +96,14 @@ if [ "$GH_EXIT" -ne 0 ]; then
   exit 1
 fi
 
-# Each page is a complete JSON object on its own line; extract PR nodes from all pages
-if ! jq -r '.data.search.nodes[]' "$TMPFILE" > "$OUTPUT" 2>&1; then
+# --paginate emits one JSON object per page, one per line.
+# Slurp all pages, flatten nodes from each page, emit one object per line.
+if ! jq -s -c '.[].data.search.nodes[] | select(type == "object")' "$TMPFILE" > "$OUTPUT" 2>&1; then
   echo "Error: jq failed to parse gh api output:" >&2
   head -5 "$TMPFILE" >&2
   exit 1
 fi
 
-COUNT=$(jq -s 'length' "$OUTPUT")
+COUNT=$(wc -l < "$OUTPUT" | tr -d ' ')
 echo "Found $COUNT PRs → $OUTPUT" >&2
 echo "$COUNT"
