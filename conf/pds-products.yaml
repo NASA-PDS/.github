@@ -121,12 +121,14 @@ products:
       - validate-test
       - transform
 
-  web-analytics:
-    description: "Web analytics tools and monitoring"
-    github_project_name: "Web Analytics"
-    work_stream: "web-modernization"
+  observability:
+    description: "PDC Observability, web analytics tools and monitoring"
+    github_project_name: "observability"
+    work_stream: "planetary-data-cloud"
     repositories:
-      - web-analytics
+      - o11y-cloudfront-batch
+      - o11y-cloudfront-streaming
+      - o11y-platform
 
   web-content:
     description: "PDS website content management and legacy systems"
@@ -163,6 +165,7 @@ products:
       - search-ui-legacy
       - portal-search-ui-legacy
       - portal-drupal
+      - portal-infra
 
   cloud-platform-engineering:
     description: "Planetary Data Cloud platform infrastructure and engineering"
@@ -173,13 +176,11 @@ products:
     repositories:
       - planetary-data-cloud
       - pdc-cds-infra
-      - pds-tf-modules
-      - pds-thin-egress-app
+      - pdc-tf-modules
       - proxycrypt
       - cloud-tools
       - cosmo-sign
       - notification-service
-      - portal-infra
 
   nucleus:
     description: "Nucleus workflow platform for planetary data processing"
@@ -315,6 +316,7 @@ products:
       - pds4-npm-utils
       - pds4-product-registry
       - email-app
+      - pds-thin-egress-app
 
 # Metadata about forked repositories
 forked_repositories:
