@@ -60,8 +60,8 @@ trap 'rm -f "$TMPFILE"' EXIT
 # Retries on non-zero exit or a non-JSON (e.g. HTML 502) response body.
 # Note: 'gh' is called with '|| true' so set -e doesn't fire mid-loop;
 # GH_EXIT is checked explicitly instead.
-MAX_ATTEMPTS=4
-BACKOFF=5
+MAX_ATTEMPTS=6
+BACKOFF=15
 GH_EXIT=0
 for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
   GH_EXIT=0
@@ -75,8 +75,8 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
     echo "Attempt $attempt/$MAX_ATTEMPTS: non-JSON response (expected '{'), body:" >&2
     head -10 "$TMPFILE" >&2
     GH_EXIT=1
-  elif grep -q '<html' "$TMPFILE" 2>/dev/null; then
-    echo "Attempt $attempt/$MAX_ATTEMPTS: HTML response in output (likely 502), body:" >&2
+  elif grep -qiE '<html|HTTP 502|Bad Gateway|503 Service' "$TMPFILE" 2>/dev/null; then
+    echo "Attempt $attempt/$MAX_ATTEMPTS: error response in output (likely 502/503), body:" >&2
     head -10 "$TMPFILE" >&2
     GH_EXIT=1
   else
