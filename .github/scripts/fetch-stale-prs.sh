@@ -19,7 +19,7 @@ echo "Fetching PRs created before $CUTOFF ..." >&2
 
 # Single-quoted heredoc: no shell substitution — $endCursor stays literal
 # for GraphQL. Cutoff is spliced in via sed after the fact.
-GQL=$(cat <<'GRAPHQL'
+GQL_TEMPLATE=$(cat <<'GRAPHQL'
 query($endCursor: String) {
   search(
     query: "org:NASA-PDS is:pr is:open draft:false created:<__CUTOFF__"
@@ -51,59 +51,86 @@ query($endCursor: String) {
 GRAPHQL
 )
 
-GQL="${GQL/__CUTOFF__/$CUTOFF}"
+GQL_TEMPLATE="${GQL_TEMPLATE/__CUTOFF__/$CUTOFF}"
 
-TMPFILE=$(mktemp)
-trap 'rm -f "$TMPFILE"' EXIT
+# Retry a single gh api graphql call (without --paginate).
+# Writes raw JSON to TMPFILE on success, returns non-zero on failure.
+# Args: $1 = query string, $2 = tmpfile path
+MAX_ATTEMPTS=8
+INITIAL_BACKOFF=15
 
-# Retry wrapper: up to MAX_ATTEMPTS with exponential backoff.
-# Retries on non-zero exit or a non-JSON (e.g. HTML 502) response body.
-# Note: 'gh' is called with '|| true' so set -e doesn't fire mid-loop;
-# GH_EXIT is checked explicitly instead.
-MAX_ATTEMPTS=6
-BACKOFF=15
-GH_EXIT=0
-for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
-  GH_EXIT=0
-  echo "Attempt $attempt/$MAX_ATTEMPTS: calling gh api graphql..." >&2
-  gh api graphql --paginate -f query="$GQL" > "$TMPFILE" 2>&1 || GH_EXIT=$?
+call_with_retry() {
+  local query="$1"
+  local tmpfile="$2"
+  local backoff=$INITIAL_BACKOFF
 
-  if [ "$GH_EXIT" -ne 0 ]; then
-    echo "Attempt $attempt/$MAX_ATTEMPTS: gh exited $GH_EXIT — response body:" >&2
-    cat "$TMPFILE" >&2
-  elif ! head -c1 "$TMPFILE" | grep -q '^{$\|^{'; then
-    echo "Attempt $attempt/$MAX_ATTEMPTS: non-JSON response (expected '{'), body:" >&2
-    head -10 "$TMPFILE" >&2
-    GH_EXIT=1
-  elif grep -qiE '<html|HTTP 502|Bad Gateway|503 Service' "$TMPFILE" 2>/dev/null; then
-    echo "Attempt $attempt/$MAX_ATTEMPTS: error response in output (likely 502/503), body:" >&2
-    head -10 "$TMPFILE" >&2
-    GH_EXIT=1
+  for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+    local gh_exit=0
+    echo "  gh call attempt $attempt/$MAX_ATTEMPTS..." >&2
+    gh api graphql -f query="$query" > "$tmpfile" 2>&1 || gh_exit=$?
+
+    if [ "$gh_exit" -eq 0 ] && \
+       head -c1 "$tmpfile" | grep -q '{' && \
+       ! grep -qiE '<html|HTTP 502|HTTP 504|Bad Gateway|503 Service|504 Gateway' "$tmpfile" 2>/dev/null; then
+      return 0
+    fi
+
+    echo "  attempt $attempt failed (exit=$gh_exit):" >&2
+    head -5 "$tmpfile" >&2
+
+    if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+      echo "  retrying in ${backoff}s..." >&2
+      sleep "$backoff"
+      backoff=$(( backoff * 2 ))
+    fi
+  done
+
+  echo "  all $MAX_ATTEMPTS attempts failed" >&2
+  return 1
+}
+
+PAGEFILE=$(mktemp)
+ALLFILE=$(mktemp)
+trap 'rm -f "$PAGEFILE" "$ALLFILE"' EXIT
+
+# Manual pagination: fetch one page at a time so each page can be retried
+# independently without restarting from the beginning.
+end_cursor="null"
+page=0
+
+while true; do
+  page=$(( page + 1 ))
+  echo "Fetching page $page (cursor: $end_cursor)..." >&2
+
+  # Build a query with the cursor inlined as a literal so we avoid passing
+  # GraphQL variables (which would require a separate --field argument and
+  # complicate the retry wrapper).
+  if [ "$end_cursor" = "null" ]; then
+    paged_query=$(echo "$GQL_TEMPLATE" | sed 's/after: \$endCursor/after: null/')
   else
-    echo "Attempt $attempt/$MAX_ATTEMPTS: success" >&2
+    paged_query=$(echo "$GQL_TEMPLATE" | sed "s/after: \\\$endCursor/after: $end_cursor/")
+  fi
+
+  if ! call_with_retry "$paged_query" "$PAGEFILE"; then
+    echo "Error: page $page fetch failed after $MAX_ATTEMPTS attempts — giving up" >&2
+    exit 1
+  fi
+
+  # Append this page's nodes to the accumulated file
+  jq -c '.data.search.nodes[] | select(type == "object")' "$PAGEFILE" >> "$ALLFILE"
+
+  has_next=$(jq -r '.data.search.pageInfo.hasNextPage' "$PAGEFILE")
+  if [ "$has_next" != "true" ]; then
     break
   fi
 
-  if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
-    echo "Retrying in ${BACKOFF}s..." >&2
-    sleep "$BACKOFF"
-    BACKOFF=$(( BACKOFF * 2 ))
-  fi
+  end_cursor=$(jq -r '.data.search.pageInfo.endCursor' "$PAGEFILE")
+  # Wrap cursor in quotes for GraphQL string literal
+  end_cursor="\"${end_cursor}\""
 done
 
-if [ "$GH_EXIT" -ne 0 ]; then
-  echo "Error: gh api graphql failed after $MAX_ATTEMPTS attempts — giving up" >&2
-  exit 1
-fi
-
-# --paginate emits one JSON object per page, one per line.
-# Slurp all pages, flatten nodes from each page, emit one object per line.
-if ! jq -s -c '.[].data.search.nodes[] | select(type == "object")' "$TMPFILE" > "$OUTPUT" 2>&1; then
-  echo "Error: jq failed to parse gh api output:" >&2
-  head -5 "$TMPFILE" >&2
-  exit 1
-fi
+cp "$ALLFILE" "$OUTPUT"
 
 COUNT=$(wc -l < "$OUTPUT" | tr -d ' ')
-echo "Found $COUNT PRs → $OUTPUT" >&2
+echo "Found $COUNT PRs across $page page(s) → $OUTPUT" >&2
 echo "$COUNT"
