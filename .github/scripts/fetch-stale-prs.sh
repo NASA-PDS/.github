@@ -102,13 +102,16 @@ while true; do
   page=$(( page + 1 ))
   echo "Fetching page $page (cursor: $end_cursor)..." >&2
 
-  # Build a query with the cursor inlined as a literal so we avoid passing
-  # GraphQL variables (which would require a separate --field argument and
-  # complicate the retry wrapper).
+  # Build a query with the cursor inlined as a literal. The variable
+  # declaration must also be removed — GitHub's API rejects unused variables.
   if [ "$end_cursor" = "null" ]; then
-    paged_query=$(echo "$GQL_TEMPLATE" | sed 's/after: \$endCursor/after: null/')
+    paged_query=$(echo "$GQL_TEMPLATE" \
+      | sed 's/query(\$endCursor: String)/query()/' \
+      | sed 's/after: \$endCursor/after: null/')
   else
-    paged_query=$(echo "$GQL_TEMPLATE" | sed "s/after: \\\$endCursor/after: $end_cursor/")
+    paged_query=$(echo "$GQL_TEMPLATE" \
+      | sed 's/query(\$endCursor: String)/query()/' \
+      | sed "s/after: \\\$endCursor/after: $end_cursor/")
   fi
 
   if ! call_with_retry "$paged_query" "$PAGEFILE"; then
