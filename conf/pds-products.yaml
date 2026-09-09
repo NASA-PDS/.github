@@ -280,7 +280,6 @@ products:
       - solr-to-es
       - merge-branch
       - PDS-Pipelines
-      - portal-search
 
   node-products:
     description: "Tools and interfaces implemented by other nodes"
