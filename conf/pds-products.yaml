@@ -166,6 +166,7 @@ products:
       - portal-search-ui-legacy
       - portal-drupal
       - portal-infra
+      - portal-search
 
   cloud-platform-engineering:
     description: "Planetary Data Cloud platform infrastructure and engineering"
@@ -279,7 +280,6 @@ products:
       - solr-to-es
       - merge-branch
       - PDS-Pipelines
-      - portal-search
 
   node-products:
     description: "Tools and interfaces implemented by other nodes"
