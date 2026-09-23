@@ -58,11 +58,22 @@ Maps product names to repositories. Key fields per product:
 
 ## Root-Level Scripts
 
-- `add_b18_sprint_to_project.py` — Finds all issues with `label:B18 AND label:sprint-backlog`, adds them to the B18 project, sets current sprint.
-- `add_b17_to_project.py` — Same pattern for B17.
+- `move_sprint_backlog.py` — Carries open sprint-backlog issues forward to a new build sprint by adding the new build label. Accepts `--from OLD_BUILD --to NEW_BUILD` (e.g. `--from B18 --to B19`). Idempotent; supports `--dry-run`. The existing `label-to-project` automation then adds the re-labeled issues to the new build project and sets the current sprint.
+- `add_b18_sprint_to_project.py` — Finds all issues with `label:B18 AND label:sprint-backlog`, adds them to the B18 project, sets current sprint. (Build-specific; superseded by `move_sprint_backlog.py` for future sprints.)
+- `add_b17_to_project.py` — Same pattern for B17. (Build-specific legacy script.)
 - `backfill_product_field.py` — Backfills the Product field (org-level and project-level) for all open issues. Supports `--dry-run`, `--force`, `--repo REPO`. Imports `GitHubProjectAutomation` from `.github/scripts/project_automation.py`.
 
 Run with: `python3 <script>.py` (requires `gh` CLI authenticated with project-scope PAT).
+
+### Sprint carry-over
+
+```bash
+# Preview what would be re-labeled
+python3 move_sprint_backlog.py --from B18 --to B19 --dry-run
+
+# Apply
+python3 move_sprint_backlog.py --from B18 --to B19
+```
 
 ## Issue Templates (`.github/ISSUE_TEMPLATE/`)
 
@@ -116,7 +127,7 @@ gh workflow run move-to-next-iteration.yml --repo NASA-PDS/.github
 - All scripts require `gh` CLI authenticated as a user with org project write access.
 - Workflows require `ORG_PROJECT_PAT` secret; private repos need it set at both org AND repo level.
 - Python scripts use only stdlib + `subprocess` (no pip dependencies), except `backfill_product_field.py` which imports from the scripts directory.
-- When adding new build sprints (e.g., B19): create a migration script following the pattern in `add_b18_sprint_to_project.py`, and update the default labels in `task.yml`.
+- When adding new build sprints (e.g., B19): run `move_sprint_backlog.py --from B18 --to B19` to carry over open sprint-backlog issues, and update the default labels in `task.yml`.
 
 ## Slack App Setup (Tumbleweeds)
 
