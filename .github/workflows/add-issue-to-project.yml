@@ -87,21 +87,21 @@ jobs:
           echo ""
           echo "✅ All done!"
 
-      - name: Set Product field
+      - name: Set Product and Work Area fields
         env:
           GH_TOKEN: ${{ secrets.gh_token }}
           REPOSITORY: ${{ inputs.repository }}
           ISSUE_NUMBER: ${{ inputs.issue_number }}
-          PROJECT_NUMBERS: ${{ inputs.project_numbers }}
         run: |
           org=$(echo "$REPOSITORY" | cut -d'/' -f1)
           python3 .github/scripts/project_automation.py \
-            set-product-field \
+            sync-fields \
             --repository "$REPOSITORY" \
             --issue-number "$ISSUE_NUMBER" \
             --org "$org" \
             --config "conf/pds-products.yaml" \
-            --project-numbers "$PROJECT_NUMBERS" || true
+            --set-product-field \
+            --set-work-area || true
 
       - name: Process build labels
         env:
@@ -137,8 +137,7 @@ jobs:
               --repository "${{ inputs.repository }}" \
               --issue-number ${{ inputs.issue_number }} \
               --org "$org" \
-              --label "$label" \
-              --config conf/pds-products.yaml
+              --label "$label"
 
             echo ""
           done <<< "$build_labels"

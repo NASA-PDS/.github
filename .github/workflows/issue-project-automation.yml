@@ -2,7 +2,7 @@ name: Issue Project Automation
 
 on:
   issues:
-    types: [opened, labeled, unlabeled]
+    types: [opened, labeled, unlabeled, transferred]
 
 jobs:
   # When an issue is opened, add it to default project(s)
@@ -33,3 +33,30 @@ jobs:
       action: ${{ github.event.action }}
     secrets:
       gh_token: ${{ secrets.ORG_PROJECT_PAT }}
+
+  # When an issue is transferred to a new repo, re-evaluate its work area and cascade to sub-issues
+  update-work-area-on-transfer:
+    if: github.event.action == 'transferred'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+        with:
+          repository: NASA-PDS/.github
+          sparse-checkout: |
+            .github/scripts
+            conf
+          sparse-checkout-cone-mode: false
+
+      - name: Re-evaluate and cascade Work Area
+        env:
+          GH_TOKEN: ${{ secrets.ORG_PROJECT_PAT }}
+        run: |
+          org=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+          python3 .github/scripts/project_automation.py \
+            sync-fields \
+            --repository "${{ github.repository }}" \
+            --issue-number ${{ github.event.issue.number }} \
+            --org "$org" \
+            --config conf/pds-products.yaml \
+            --set-work-area

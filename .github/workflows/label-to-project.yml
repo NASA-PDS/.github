@@ -59,13 +59,23 @@ jobs:
             --set-sprint-if-backlog \
             --config conf/pds-products.yaml
 
-          # Also set org-level Product field (org fields cannot be used for project grouping)
+          # Also set org-level Product and Work Area fields
           python3 .github/scripts/project_automation.py \
-            set-product-field \
+            sync-fields \
             --repository "${{ inputs.repository }}" \
             --issue-number ${{ inputs.issue_number }} \
             --org "$org" \
-            --config conf/pds-products.yaml || true
+            --config conf/pds-products.yaml \
+            --set-product-field \
+            --set-work-area || true
+
+          # Cascade build label to all sub-issues
+          python3 .github/scripts/project_automation.py \
+            cascade-label \
+            --repository "${{ inputs.repository }}" \
+            --issue-number ${{ inputs.issue_number }} \
+            --label "${{ inputs.label_name }}" \
+            --label-action add || true
 
       - name: Add to sprint when sprint-backlog label added
         if: inputs.action == 'labeled' && inputs.label_name == 'sprint-backlog'
@@ -110,3 +120,11 @@ jobs:
             --issue-number ${{ inputs.issue_number }} \
             --org "$org" \
             --label "${{ inputs.label_name }}"
+
+          # Cascade label removal to all sub-issues
+          python3 .github/scripts/project_automation.py \
+            cascade-label \
+            --repository "${{ inputs.repository }}" \
+            --issue-number ${{ inputs.issue_number }} \
+            --label "${{ inputs.label_name }}" \
+            --label-action remove || true
