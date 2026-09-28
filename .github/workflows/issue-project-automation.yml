@@ -4,6 +4,9 @@ on:
   issues:
     types: [opened, labeled, unlabeled, transferred]
 
+permissions:
+  contents: read
+
 jobs:
   # When an issue is opened, add it to default project(s)
   add-new-issue-to-project:
