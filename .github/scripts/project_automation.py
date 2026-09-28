@@ -970,7 +970,7 @@ class GitHubProjectAutomation:
         except (GitHubAPIError, json.JSONDecodeError):
             return None
 
-    def get_issue_current_work_area(self, issue_id: str, org: str) -> Optional[str]:
+    def get_issue_current_work_area(self, issue_id: str) -> Optional[str]:
         """Return the current Work Area field value on an issue, or None if unset."""
         query = """
         query($issueId: ID!) {
@@ -1168,24 +1168,24 @@ class GitHubProjectAutomation:
         products: Dict[str, Any],
         repo_name: str,
         field_name: str
-    ) -> Optional[tuple]:
+    ) -> tuple:
         """Resolve the Product field write tuple for sync_fields.
 
-        Returns:
-            (field_id, value, display_name) tuple if the field should be written,
-            empty tuple () if it should be skipped (benign),
-            None if a hard error occurred (caller should return False).
+        Returns (product_value, write_tuple) where:
+          - write_tuple is (field_id, value, display_name) on success,
+          - write_tuple is () to skip (benign — no mapping or no field),
+          - write_tuple is None on hard error (caller should return False).
         """
         product_name = self._find_product_for_repo(products, repo_name)
         if not product_name:
             print(f"ℹ️  No product mapping for '{repo_name}' — skipping '{field_name}' field")
-            return ()
+            return (None, ())
         print(f"Repo '{repo_name}' → product '{product_name}'")
         try:
             field_data = self.get_org_issue_field(org, field_name)
             if not field_data:
                 print(f"ℹ️  No '{field_name}' org issue field found — skipping")
-                return ()
+                return (None, ())
             options = field_data.get('options', [])
             if options and product_name not in [o['name'] for o in options]:
                 print(
@@ -1193,11 +1193,11 @@ class GitHubProjectAutomation:
                     f"Available: {[o['name'] for o in options]}",
                     file=sys.stderr
                 )
-                return None
-            return (field_data['id'], product_name, field_name)
+                return (None, None)
+            return (product_name, (field_data['id'], product_name, field_name))
         except GitHubAPIError as e:
             print(f"❌ Could not resolve '{field_name}' field: {e}", file=sys.stderr)
-            return None
+            return (None, None)
 
     def _resolve_work_area_field_write(
         self,
@@ -1239,6 +1239,33 @@ class GitHubProjectAutomation:
             print(f"❌ Could not resolve '{WORK_AREA_FIELD}' field: {e}", file=sys.stderr)
             return (None, None)
 
+    def _apply_field_writes(
+        self,
+        repository: str,
+        issue_number: int,
+        field_writes: List[tuple],
+        issue_id: str,
+        work_area_value: Optional[str],
+        org: str,
+        config_path: str,
+        cascade: bool
+    ) -> bool:
+        """Execute a batched PUT for resolved field writes and optionally cascade Work Area."""
+        if not field_writes:
+            return True
+        try:
+            self.set_org_issue_field_values(
+                repository, issue_number, [(fid, val) for fid, val, _ in field_writes]
+            )
+            for _, val, label in field_writes:
+                print(f"✅ Set org '{label}' to '{val}' on {repository}#{issue_number}")
+        except GitHubAPIError as e:
+            print(f"❌ {e}", file=sys.stderr)
+            return False
+        if cascade and work_area_value:
+            self._cascade_work_area_to_sub_issues(issue_id, work_area_value, org, config_path)
+        return True
+
     def sync_fields(
         self,
         repository: str,
@@ -1273,7 +1300,7 @@ class GitHubProjectAutomation:
         work_area_value: Optional[str] = None
 
         if set_product:
-            write = self._resolve_product_field_write(org, products, repo_name, field_name)
+            _, write = self._resolve_product_field_write(org, products, repo_name, field_name)
             if write is None:
                 return False
             if write:
@@ -1288,23 +1315,9 @@ class GitHubProjectAutomation:
             if write:
                 field_writes.append(write)
 
-        if not field_writes:
-            return True
-
-        try:
-            self.set_org_issue_field_values(
-                repository, issue_number, [(fid, val) for fid, val, _ in field_writes]
-            )
-            for _, val, label in field_writes:
-                print(f"✅ Set org '{label}' to '{val}' on {repository}#{issue_number}")
-        except GitHubAPIError as e:
-            print(f"❌ {e}", file=sys.stderr)
-            return False
-
-        if cascade and work_area_value:
-            self._cascade_work_area_to_sub_issues(issue_id, work_area_value, org, config_path)
-
-        return True
+        return self._apply_field_writes(
+            repository, issue_number, field_writes, issue_id, work_area_value, org, config_path, cascade
+        )
 
     def _cascade_work_area_to_sub_issues(
         self,
@@ -1463,6 +1476,37 @@ class GitHubProjectAutomation:
 
         return issues
 
+    def _build_fields_to_write(
+        self,
+        repository: str,
+        number: int,
+        work_area: Optional[str],
+        product_name: Optional[str],
+        wa_field: Optional[Dict[str, Any]],
+        prod_field: Optional[Dict[str, Any]],
+        force: bool
+    ) -> Optional[List[tuple]]:
+        """Return list of (field_id, value, display_name) tuples to write, or None to skip."""
+        candidate: List[tuple] = []
+        if work_area and wa_field:
+            candidate.append((wa_field['id'], work_area, WORK_AREA_FIELD))
+        if product_name and prod_field:
+            candidate.append((prod_field['id'], product_name, "Product"))
+
+        if force:
+            return candidate
+
+        current = self._get_current_org_field_values(repository, number)
+        fields_to_write = [
+            f for f in candidate
+            if not current.get(f[2])
+        ]
+        if not fields_to_write:
+            already = ", ".join(f"{k}='{v}'" for k, v in current.items() if v)
+            print(f"  ℹ️  #{number} already has {already} — skipping")
+            return None
+        return fields_to_write
+
     def _backfill_issue(
         self,
         repository: str,
@@ -1476,24 +1520,11 @@ class GitHubProjectAutomation:
     ) -> int:
         """Backfill org fields on a single issue. Returns 1 if updated (or dry-run would update), else 0."""
         number = issue['number']
-
-        if not force:
-            current = self._get_current_org_field_values(repository, number)
-            fields_to_write = []
-            if work_area and wa_field and not current[WORK_AREA_FIELD]:
-                fields_to_write.append((wa_field['id'], work_area, WORK_AREA_FIELD))
-            if product_name and prod_field and not current["Product"]:
-                fields_to_write.append((prod_field['id'], product_name, "Product"))
-            if not fields_to_write:
-                already = ", ".join(f"{k}='{v}'" for k, v in current.items() if v)
-                print(f"  ℹ️  #{number} already has {already} — skipping")
-                return 0
-        else:
-            fields_to_write = []
-            if work_area and wa_field:
-                fields_to_write.append((wa_field['id'], work_area, WORK_AREA_FIELD))
-            if product_name and prod_field:
-                fields_to_write.append((prod_field['id'], product_name, "Product"))
+        fields_to_write = self._build_fields_to_write(
+            repository, number, work_area, product_name, wa_field, prod_field, force
+        )
+        if fields_to_write is None:
+            return 0
 
         labels_desc = ", ".join(f"{n}='{v}'" for _, v, n in fields_to_write)
         if dry_run:
@@ -1553,32 +1584,43 @@ class GitHubProjectAutomation:
         for product_key, info in products.items():
             if info.get('ignore'):
                 continue
-
             work_area = info.get('work_area') if backfill_work_area else None
             product_name = (info.get('github_project_name') or product_key) if backfill_product else None
-
             if not work_area and not product_name:
                 continue
-
             for repo_name in info.get('repositories', []):
                 if repo_filter and repo_name != repo_filter:
                     continue
-
-                repository = f"{org}/{repo_name}"
-                fields_desc = ", ".join(filter(None, [
-                    f"work_area={work_area}" if work_area else None,
-                    f"product={product_name}" if product_name else None,
-                ]))
-                print(f"\nProcessing {repository} ({fields_desc})")
-
-                issues = self._fetch_all_open_issues(repository)
-                for issue in issues:
-                    updated += self._backfill_issue(
-                        repository, issue, work_area, product_name,
-                        wa_field, prod_field, force, dry_run
-                    )
+                updated += self._backfill_repo(
+                    org, repo_name, work_area, product_name, wa_field, prod_field, force, dry_run
+                )
 
         print(f"\n{'[dry-run] ' if dry_run else ''}{'Would update' if dry_run else 'Updated'} {updated} issue(s)")
+        return updated
+
+    def _backfill_repo(
+        self,
+        org: str,
+        repo_name: str,
+        work_area: Optional[str],
+        product_name: Optional[str],
+        wa_field: Optional[Dict[str, Any]],
+        prod_field: Optional[Dict[str, Any]],
+        force: bool,
+        dry_run: bool
+    ) -> int:
+        """Backfill org fields for all open issues in one repository. Returns count updated."""
+        repository = f"{org}/{repo_name}"
+        fields_desc = ", ".join(filter(None, [
+            f"work_area={work_area}" if work_area else None,
+            f"product={product_name}" if product_name else None,
+        ]))
+        print(f"\nProcessing {repository} ({fields_desc})")
+        updated = 0
+        for issue in self._fetch_all_open_issues(repository):
+            updated += self._backfill_issue(
+                repository, issue, work_area, product_name, wa_field, prod_field, force, dry_run
+            )
         return updated
 
 def main():
