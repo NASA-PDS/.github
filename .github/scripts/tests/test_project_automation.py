@@ -244,6 +244,13 @@ class TestFetchAllOpenIssues(unittest.TestCase):
         result = self.auto._fetch_all_open_issues("NASA-PDS/validate")
         self.assertEqual(result, [])
 
+    def test_jq_filter_excludes_pull_requests(self):
+        """The jq filter passed to gh must exclude PRs (select(.pull_request == null))."""
+        self.auto._run_gh_api = MagicMock(return_value=json.dumps([]))
+        self.auto._fetch_all_open_issues("NASA-PDS/validate")
+        jq_arg = self.auto._run_gh_api.call_args[0][0][-1]
+        self.assertIn("pull_request == null", jq_arg)
+
 
 class TestBackfillIssue(unittest.TestCase):
     def setUp(self):

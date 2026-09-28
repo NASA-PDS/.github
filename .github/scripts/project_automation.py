@@ -1439,7 +1439,7 @@ class GitHubProjectAutomation:
             try:
                 page_json = self._run_gh_api([
                     f"repos/{repository}/issues?state=open&per_page=100&page={page}",
-                    "--jq", "[.[] | {number: .number, node_id: .node_id, title: .title}]"
+                    "--jq", "[.[] | select(.pull_request == null) | {number: .number, node_id: .node_id, title: .title}]"
                 ])
             except GitHubAPIError as e:
                 print(f"  ⚠️  Could not list issues for {repository}: {e}", file=sys.stderr)
