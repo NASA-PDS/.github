@@ -24,10 +24,23 @@ This is the NASA-PDS organization-level `.github` repository. It serves two func
 | `move-to-next-iteration.yml` | Org-wide scheduled | Thursdays 07:00 UTC; manual dispatch |
 | `add-issue-to-project.yml` | Reusable (`workflow_call`) | Called by other repos |
 | `label-to-project.yml` | Reusable (`workflow_call`) | Called by other repos |
-| `issue-project-automation.yml` | Template to copy to repos | Issues opened/labeled/unlabeled |
+| `issue-project-automation.yml` | Default + per-repo template (see below) | Issues opened/labeled/unlabeled |
 | `stale-prs-slack.yml` | Org-wide scheduled | Weekday mornings; manual dispatch |
 
 **Reusable workflows** (called via `uses:`) check out scripts from this repo using sparse checkout of `.github/scripts/` and `conf/`, then execute `project-utils.sh` (bash) or `project_automation.py` (Python).
+
+### `issue-project-automation.yml`: two roles, one file
+
+This file serves two distinct roles and it is important not to conflate them:
+
+1. **Org-wide default** — Because this lives in the NASA-PDS `.github` repo, GitHub automatically applies it to any NASA-PDS repository that does *not* have its own `.github/workflows/issue-project-automation.yml`. No action is needed in those repos; they inherit it directly.
+
+2. **Per-repo template** — When a repo needs customization (e.g. a different `project_numbers` value), a maintainer copies this file into that repo's own `.github/workflows/`. That copy is then **fully owned by the individual repo** and is no longer kept in sync with this file automatically. Changes made here do **not** propagate to repos that have their own copy.
+
+**Consequences for maintenance:**
+- Changes to the *reusable* workflows (`label-to-project.yml`, `add-issue-to-project.yml`) and scripts (`project_automation.py`) are picked up automatically by all callers on their next run — no per-repo updates needed.
+- Changes to `issue-project-automation.yml` itself (triggers, job structure, new jobs) only affect repos still using the org default. Repos with their own copy must be updated manually.
+- Before modifying `issue-project-automation.yml`, check how many repos have their own copy so you can assess the update surface.
 
 ## Scripts
 

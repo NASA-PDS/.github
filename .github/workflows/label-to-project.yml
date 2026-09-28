@@ -47,17 +47,14 @@ jobs:
           # Extract org from repository
           org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
 
-          # Add to build project and set project-level Product field
           # --set-sprint-if-backlog: also set current sprint if sprint-backlog is already on the issue
-          # --config: also set the Product single-select field on the project item
           python3 .github/scripts/project_automation.py \
             add-to-build-project \
             --repository "${{ inputs.repository }}" \
             --issue-number ${{ inputs.issue_number }} \
             --org "$org" \
             --label "${{ inputs.label_name }}" \
-            --set-sprint-if-backlog \
-            --config conf/pds-products.yaml
+            --set-sprint-if-backlog
 
           # Also set org-level Product and Work Area fields
           python3 .github/scripts/project_automation.py \

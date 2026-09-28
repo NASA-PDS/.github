@@ -1,3 +1,20 @@
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │  TWO ROLES — READ BEFORE EDITING                                            │
+# │                                                                             │
+# │  1. Org-wide default: GitHub automatically applies this file to any         │
+# │     NASA-PDS repo that does NOT have its own copy. Those repos inherit      │
+# │     it directly; no action required in them.                                │
+# │                                                                             │
+# │  2. Per-repo template: when a repo needs customization (e.g. different      │
+# │     project_numbers), a maintainer copies this file into that repo's own    │
+# │     .github/workflows/. That copy is fully owned by the individual repo     │
+# │     and is no longer synced with this file automatically.                   │
+# │                                                                             │
+# │  Editing THIS file:                                                         │
+# │  - Reusable workflow / script changes → picked up automatically by all.    │
+# │  - Changes here (triggers, jobs) → only affect repos using the org default. │
+# │    Repos with their own copy must be updated manually.                      │
+# └─────────────────────────────────────────────────────────────────────────────┘
 name: Issue Project Automation
 
 on:

@@ -14,6 +14,10 @@ import os
 from typing import Optional, List, Dict, Any
 
 
+BUILD_LABEL_RE = re.compile(r'^B\d+$')
+WORK_AREA_FIELD = "Work Area"
+
+
 class GitHubAPIError(Exception):
     """Raised when a GitHub API call fails."""
     pass
@@ -575,11 +579,9 @@ class GitHubProjectAutomation:
         print(f"Processing build label: {label}")
 
         # Validate build label format (B followed by digits)
-        if not re.match(r'^B\d+$', label):
+        if not BUILD_LABEL_RE.match(label):
             print(f"ℹ️  Label '{label}' does not match build label pattern (B followed by digits) - skipping")
             return True  # Not an error, just not a build label
-
-        repo_name = repository.split('/')[-1]
 
         try:
             # Get issue node ID
@@ -651,7 +653,7 @@ class GitHubProjectAutomation:
         """
         print(f"Removing issue from build project for label: {label}")
 
-        if not re.match(r'^B\d+$', label):
+        if not BUILD_LABEL_RE.match(label):
             print(f"ℹ️  Label '{label}' does not match build label pattern — skipping")
             return True
 
@@ -785,6 +787,19 @@ class GitHubProjectAutomation:
         """Set a single org-level issue field value via REST PUT."""
         self.set_org_issue_field_values(repository, issue_number, [(field_id, value)])
 
+    @staticmethod
+    def _parse_existing_field_value(entry: Dict[str, Any]) -> Any:
+        """Extract the PUT-compatible value from a single issue-field-values API entry."""
+        dtype = entry.get('data_type')
+        if dtype == 'single_select':
+            opt = entry.get('single_select_option')
+            return opt['name'] if opt else None
+        if dtype == 'multi_select':
+            opts = entry.get('multi_select_options', [])
+            return [o['name'] for o in opts] if opts else None
+        # text, number, date — .value is the correct PUT representation
+        return entry.get('value')
+
     def set_org_issue_field_values(
         self, repository: str, issue_number: int, fields: List[tuple]
     ) -> None:
@@ -812,21 +827,13 @@ class GitHubProjectAutomation:
             ])
             for entry in (json.loads(raw_json) if raw_json else []):
                 fid = entry['issue_field_id']
-                dtype = entry.get('data_type')
-                if dtype == 'single_select':
-                    opt = entry.get('single_select_option')
-                    if opt:
-                        existing[fid] = opt['name']
-                elif dtype == 'multi_select':
-                    opts = entry.get('multi_select_options', [])
-                    if opts:
-                        existing[fid] = [o['name'] for o in opts]
-                else:
-                    # text, number, date — .value is the correct PUT representation
-                    if entry.get('value') is not None:
-                        existing[fid] = entry['value']
-        except (GitHubAPIError, json.JSONDecodeError):
-            pass
+                val = self._parse_existing_field_value(entry)
+                if val is not None:
+                    existing[fid] = val
+        except (GitHubAPIError, json.JSONDecodeError, KeyError) as e:
+            raise GitHubAPIError(
+                f"Failed to read existing org field values for {repository}#{issue_number}: {e}"
+            )
 
         # Overlay our updates
         for fid, val in fields:
@@ -987,7 +994,7 @@ class GitHubProjectAutomation:
                 "graphql",
                 "-f", f"query={query}",
                 "-f", f"issueId={issue_id}",
-                "--jq", '.data.node.issueFieldValues.nodes[] | select(.field.name == "Work Area") | .name'
+                "--jq", f'.data.node.issueFieldValues.nodes[] | select(.field.name == "{WORK_AREA_FIELD}") | .name'
             ])
             return result if result else None
         except GitHubAPIError:
@@ -996,10 +1003,10 @@ class GitHubProjectAutomation:
     def get_issue_sub_issues(self, issue_id: str) -> List[Dict[str, Any]]:
         """Return list of direct sub-issues (id, number, repository) for an issue."""
         query = """
-        query($issueId: ID!) {
+        query($issueId: ID!, $cursor: String) {
             node(id: $issueId) {
                 ... on Issue {
-                    subIssues(first: 100) {
+                    subIssues(first: 100, after: $cursor) {
                         nodes {
                             id
                             number
@@ -1008,28 +1015,43 @@ class GitHubProjectAutomation:
                                 name
                             }
                         }
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
                     }
                 }
             }
         }
         """
-        try:
-            result = self._run_gh_api([
-                "graphql",
-                "-f", f"query={query}",
-                "-f", f"issueId={issue_id}",
-                "--jq", ".data.node.subIssues.nodes"
-            ])
-            if not result or result == "null":
-                return []
-            return json.loads(result)
-        except (GitHubAPIError, json.JSONDecodeError):
-            return []
+        all_sub_issues: List[Dict[str, Any]] = []
+        cursor = None
+        while True:
+            try:
+                args = [
+                    "graphql",
+                    "-f", f"query={query}",
+                    "-f", f"issueId={issue_id}",
+                ]
+                if cursor:
+                    args += ["-f", f"cursor={cursor}"]
+                raw = self._run_gh_api(args + ["--jq", ".data.node.subIssues"])
+                if not raw or raw == "null":
+                    break
+                page = json.loads(raw)
+                nodes = page.get("nodes") or []
+                all_sub_issues.extend(nodes)
+                page_info = page.get("pageInfo", {})
+                if not page_info.get("hasNextPage"):
+                    break
+                cursor = page_info.get("endCursor")
+            except (GitHubAPIError, json.JSONDecodeError):
+                break
+        return all_sub_issues
 
     def resolve_work_area(
         self,
         repository: str,
-        issue_number: int,
         issue_id: str,
         config_path: str
     ) -> Optional[str]:
@@ -1044,13 +1066,18 @@ class GitHubProjectAutomation:
 
         current_id = issue_id
         current_repo = repository
+        visited: set = {current_id}
 
         # Walk up to the root of the parent chain
         while True:
             parent = self.get_issue_parent(current_id)
             if not parent:
                 break
-            current_id = parent['id']
+            parent_id = parent['id']
+            if parent_id in visited:
+                break
+            visited.add(parent_id)
+            current_id = parent_id
             current_repo = parent['repository']['nameWithOwner']
 
         repo_name = current_repo.split('/')[-1]
@@ -1065,7 +1092,7 @@ class GitHubProjectAutomation:
     ) -> bool:
         """Set the org-level Work Area field on an issue."""
         try:
-            field_data = self.get_org_issue_field(org, "Work Area")
+            field_data = self.get_org_issue_field(org, WORK_AREA_FIELD)
             if not field_data:
                 print("ℹ️  No 'Work Area' org issue field found — skipping", file=sys.stderr)
                 return True
@@ -1122,7 +1149,7 @@ class GitHubProjectAutomation:
             print(f"❌ Could not get issue node ID: {e}", file=sys.stderr)
             return False
 
-        work_area = self.resolve_work_area(repository, issue_number, issue_id, config_path)
+        work_area = self.resolve_work_area(repository, issue_id, config_path)
         if not work_area:
             print(f"ℹ️  No work_area mapping for '{repository.split('/')[-1]}' — skipping")
             return True
@@ -1134,6 +1161,83 @@ class GitHubProjectAutomation:
             self._cascade_work_area_to_sub_issues(issue_id, work_area, org, config_path)
 
         return success
+
+    def _resolve_product_field_write(
+        self,
+        org: str,
+        products: Dict[str, Any],
+        repo_name: str,
+        field_name: str
+    ) -> Optional[tuple]:
+        """Resolve the Product field write tuple for sync_fields.
+
+        Returns:
+            (field_id, value, display_name) tuple if the field should be written,
+            empty tuple () if it should be skipped (benign),
+            None if a hard error occurred (caller should return False).
+        """
+        product_name = self._find_product_for_repo(products, repo_name)
+        if not product_name:
+            print(f"ℹ️  No product mapping for '{repo_name}' — skipping '{field_name}' field")
+            return ()
+        print(f"Repo '{repo_name}' → product '{product_name}'")
+        try:
+            field_data = self.get_org_issue_field(org, field_name)
+            if not field_data:
+                print(f"ℹ️  No '{field_name}' org issue field found — skipping")
+                return ()
+            options = field_data.get('options', [])
+            if options and product_name not in [o['name'] for o in options]:
+                print(
+                    f"⚠️  '{product_name}' is not a valid option for org '{field_name}'. "
+                    f"Available: {[o['name'] for o in options]}",
+                    file=sys.stderr
+                )
+                return None
+            return (field_data['id'], product_name, field_name)
+        except GitHubAPIError as e:
+            print(f"❌ Could not resolve '{field_name}' field: {e}", file=sys.stderr)
+            return None
+
+    def _resolve_work_area_field_write(
+        self,
+        org: str,
+        repository: str,
+        issue_id: str,
+        config_path: str,
+        repo_name: str,
+        issue_number: int
+    ) -> tuple:
+        """Resolve the Work Area field write tuple for sync_fields.
+
+        Returns:
+            (work_area_value, write_tuple) where write_tuple is:
+              - (field_id, value, display_name) if the field should be written,
+              - () if it should be skipped (benign),
+              - None if a hard error occurred (caller should return False).
+        """
+        work_area_value = self.resolve_work_area(repository, issue_id, config_path)
+        if not work_area_value:
+            print(f"ℹ️  No work_area mapping for '{repo_name}' — skipping Work Area field")
+            return (None, ())
+        print(f"Resolved work area: '{work_area_value}' for {repository}#{issue_number}")
+        try:
+            wa_field = self.get_org_issue_field(org, WORK_AREA_FIELD)
+            if not wa_field:
+                print(f"ℹ️  No '{WORK_AREA_FIELD}' org issue field found — skipping")
+                return (None, ())
+            options = wa_field.get('options', [])
+            if options and work_area_value not in [o['name'] for o in options]:
+                print(
+                    f"⚠️  '{work_area_value}' is not a valid Work Area option. "
+                    f"Available: {[o['name'] for o in options]}",
+                    file=sys.stderr
+                )
+                return (None, None)
+            return (work_area_value, (wa_field['id'], work_area_value, WORK_AREA_FIELD))
+        except GitHubAPIError as e:
+            print(f"❌ Could not resolve '{WORK_AREA_FIELD}' field: {e}", file=sys.stderr)
+            return (None, None)
 
     def sync_fields(
         self,
@@ -1169,53 +1273,20 @@ class GitHubProjectAutomation:
         work_area_value: Optional[str] = None
 
         if set_product:
-            product_name = self._find_product_for_repo(products, repo_name)
-            if not product_name:
-                print(f"ℹ️  No product mapping for '{repo_name}' — skipping '{field_name}' field")
-            else:
-                print(f"Repo '{repo_name}' → product '{product_name}'")
-                try:
-                    field_data = self.get_org_issue_field(org, field_name)
-                    if not field_data:
-                        print(f"ℹ️  No '{field_name}' org issue field found — skipping")
-                    else:
-                        options = field_data.get('options', [])
-                        if options and product_name not in [o['name'] for o in options]:
-                            print(
-                                f"⚠️  '{product_name}' is not a valid option for org '{field_name}'. "
-                                f"Available: {[o['name'] for o in options]}",
-                                file=sys.stderr
-                            )
-                            return False
-                        field_writes.append((field_data['id'], product_name, field_name))
-                except GitHubAPIError as e:
-                    print(f"❌ Could not resolve '{field_name}' field: {e}", file=sys.stderr)
-                    return False
+            write = self._resolve_product_field_write(org, products, repo_name, field_name)
+            if write is None:
+                return False
+            if write:
+                field_writes.append(write)
 
         if set_work_area:
-            work_area_value = self.resolve_work_area(repository, issue_number, issue_id, config_path)
-            if not work_area_value:
-                print(f"ℹ️  No work_area mapping for '{repo_name}' — skipping Work Area field")
-            else:
-                print(f"Resolved work area: '{work_area_value}' for {repository}#{issue_number}")
-                try:
-                    wa_field = self.get_org_issue_field(org, "Work Area")
-                    if not wa_field:
-                        print("ℹ️  No 'Work Area' org issue field found — skipping")
-                        work_area_value = None
-                    else:
-                        options = wa_field.get('options', [])
-                        if options and work_area_value not in [o['name'] for o in options]:
-                            print(
-                                f"⚠️  '{work_area_value}' is not a valid Work Area option. "
-                                f"Available: {[o['name'] for o in options]}",
-                                file=sys.stderr
-                            )
-                            return False
-                        field_writes.append((wa_field['id'], work_area_value, "Work Area"))
-                except GitHubAPIError as e:
-                    print(f"❌ Could not resolve 'Work Area' field: {e}", file=sys.stderr)
-                    return False
+            work_area_value, write = self._resolve_work_area_field_write(
+                org, repository, issue_id, config_path, repo_name, issue_number
+            )
+            if write is None:
+                return False
+            if write:
+                field_writes.append(write)
 
         if not field_writes:
             return True
@@ -1273,7 +1344,7 @@ class GitHubProjectAutomation:
         Returns:
             Number of sub-issues updated
         """
-        if not re.match(r'^B\d+$', label):
+        if not BUILD_LABEL_RE.match(label):
             print(f"ℹ️  '{label}' is not a build label — skipping cascade")
             return 0
 
@@ -1313,17 +1384,18 @@ class GitHubProjectAutomation:
                     ])
                     print(f"  ✅ Removed '{label}' from {repo}#{number}")
                 updated += 1
+                updated += self._cascade_label(sub_id, label, action)
             except GitHubAPIError as e:
                 # 404 on DELETE means label wasn't present — not an error
                 if action == "remove" and "404" in str(e):
                     print(f"  ℹ️  '{label}' not on {repo}#{number} — skipping")
+                    updated += self._cascade_label(sub_id, label, action)
                 else:
                     print(f"  ⚠️  Could not {action} label on {repo}#{number}: {e}", file=sys.stderr)
-            updated += self._cascade_label(sub_id, label, action)
         return updated
 
     def _get_current_org_field_values(
-        self, repository: str, issue_number: int, org: str
+        self, repository: str, issue_number: int
     ) -> Dict[str, Optional[str]]:
         """Return {field_name: value} for Work Area and Product on an issue, or None if unset."""
         query = """
@@ -1342,7 +1414,7 @@ class GitHubProjectAutomation:
             }
         }
         """
-        result: Dict[str, Optional[str]] = {"Work Area": None, "Product": None}
+        result: Dict[str, Optional[str]] = {WORK_AREA_FIELD: None, "Product": None}
         try:
             issue_id = self.get_issue_id(repository, issue_number)
             raw = self._run_gh_api([
@@ -1358,6 +1430,85 @@ class GitHubProjectAutomation:
         except (GitHubAPIError, json.JSONDecodeError):
             pass
         return result
+
+    def _fetch_all_open_issues(self, repository: str) -> List[Dict[str, Any]]:
+        """Fetch all open issues for a repository, paginating through results."""
+        issues: List[Dict[str, Any]] = []
+        page = 1
+        while True:
+            try:
+                page_json = self._run_gh_api([
+                    f"repos/{repository}/issues?state=open&per_page=100&page={page}",
+                    "--jq", "[.[] | {number: .number, node_id: .node_id, title: .title}]"
+                ])
+            except GitHubAPIError as e:
+                print(f"  ⚠️  Could not list issues for {repository}: {e}", file=sys.stderr)
+                break
+
+            if not page_json:
+                break
+
+            try:
+                page_issues = json.loads(page_json)
+            except json.JSONDecodeError:
+                break
+
+            if not page_issues:
+                break
+
+            issues.extend(page_issues)
+            if len(page_issues) < 100:
+                break
+            page += 1
+
+        return issues
+
+    def _backfill_issue(
+        self,
+        repository: str,
+        issue: Dict[str, Any],
+        work_area: Optional[str],
+        product_name: Optional[str],
+        wa_field: Optional[Dict[str, Any]],
+        prod_field: Optional[Dict[str, Any]],
+        force: bool,
+        dry_run: bool
+    ) -> int:
+        """Backfill org fields on a single issue. Returns 1 if updated (or dry-run would update), else 0."""
+        number = issue['number']
+
+        if not force:
+            current = self._get_current_org_field_values(repository, number)
+            fields_to_write = []
+            if work_area and wa_field and not current[WORK_AREA_FIELD]:
+                fields_to_write.append((wa_field['id'], work_area, WORK_AREA_FIELD))
+            if product_name and prod_field and not current["Product"]:
+                fields_to_write.append((prod_field['id'], product_name, "Product"))
+            if not fields_to_write:
+                already = ", ".join(f"{k}='{v}'" for k, v in current.items() if v)
+                print(f"  ℹ️  #{number} already has {already} — skipping")
+                return 0
+        else:
+            fields_to_write = []
+            if work_area and wa_field:
+                fields_to_write.append((wa_field['id'], work_area, WORK_AREA_FIELD))
+            if product_name and prod_field:
+                fields_to_write.append((prod_field['id'], product_name, "Product"))
+
+        labels_desc = ", ".join(f"{n}='{v}'" for _, v, n in fields_to_write)
+        if dry_run:
+            print(f"  [dry-run] Would set {labels_desc} on #{number}: {issue['title']}")
+            return 1
+
+        try:
+            self.set_org_issue_field_values(
+                repository, number, [(fid, val) for fid, val, _ in fields_to_write]
+            )
+            print(f"  ✅ Set {labels_desc} on #{number}: {issue['title']}")
+            return 1
+        except GitHubAPIError as e:
+            print(f"  ❌ #{number}: {e}", file=sys.stderr)
+            return 0
 
     def backfill_fields(
         self,
@@ -1394,7 +1545,7 @@ class GitHubProjectAutomation:
         products = self._load_products_config(config_path)
 
         # Pre-fetch org field IDs once
-        wa_field = self.get_org_issue_field(org, "Work Area") if backfill_work_area else None
+        wa_field = self.get_org_issue_field(org, WORK_AREA_FIELD) if backfill_work_area else None
         prod_field = self.get_org_issue_field(org, "Product") if backfill_product else None
 
         updated = 0
@@ -1420,117 +1571,15 @@ class GitHubProjectAutomation:
                 ]))
                 print(f"\nProcessing {repository} ({fields_desc})")
 
-                try:
-                    issues_json = self._run_gh_api([
-                        f"repos/{repository}/issues?state=open&per_page=100",
-                        "--jq", "[.[] | {number: .number, node_id: .node_id, title: .title}]"
-                    ])
-                except GitHubAPIError as e:
-                    print(f"  ⚠️  Could not list issues for {repository}: {e}", file=sys.stderr)
-                    continue
-
-                if not issues_json:
-                    continue
-
-                try:
-                    issues = json.loads(issues_json)
-                except json.JSONDecodeError:
-                    continue
-
+                issues = self._fetch_all_open_issues(repository)
                 for issue in issues:
-                    number = issue['number']
-
-                    # Determine which fields need writing for this issue
-                    if not force:
-                        current = self._get_current_org_field_values(repository, number, org)
-                        fields_to_write = []
-                        if work_area and wa_field and not current["Work Area"]:
-                            fields_to_write.append((wa_field['id'], work_area, "Work Area"))
-                        if product_name and prod_field and not current["Product"]:
-                            fields_to_write.append((prod_field['id'], product_name, "Product"))
-                        if not fields_to_write:
-                            already = ", ".join(
-                                f"{k}='{v}'" for k, v in current.items() if v
-                            )
-                            print(f"  ℹ️  #{number} already has {already} — skipping")
-                            continue
-                    else:
-                        fields_to_write = []
-                        if work_area and wa_field:
-                            fields_to_write.append((wa_field['id'], work_area, "Work Area"))
-                        if product_name and prod_field:
-                            fields_to_write.append((prod_field['id'], product_name, "Product"))
-
-                    labels_desc = ", ".join(f"{n}='{v}'" for _, v, n in fields_to_write)
-                    if dry_run:
-                        print(f"  [dry-run] Would set {labels_desc} on #{number}: {issue['title']}")
-                        updated += 1
-                    else:
-                        try:
-                            self.set_org_issue_field_values(
-                                repository, number,
-                                [(fid, val) for fid, val, _ in fields_to_write]
-                            )
-                            print(f"  ✅ Set {labels_desc} on #{number}: {issue['title']}")
-                            updated += 1
-                        except GitHubAPIError as e:
-                            print(f"  ❌ #{number}: {e}", file=sys.stderr)
+                    updated += self._backfill_issue(
+                        repository, issue, work_area, product_name,
+                        wa_field, prod_field, force, dry_run
+                    )
 
         print(f"\n{'[dry-run] ' if dry_run else ''}{'Would update' if dry_run else 'Updated'} {updated} issue(s)")
         return updated
-
-    def set_product_field(
-        self,
-        repository: str,
-        issue_number: int,
-        org: str,
-        config_path: str,
-        field_name: str = "Product"
-    ) -> bool:
-        """Set the org-level Product field on an issue.
-
-        Returns True on success or benign skip, False on hard failure.
-        """
-        if not os.path.exists(config_path):
-            print(f"⚠️  Products config not found: {config_path}", file=sys.stderr)
-            return False
-
-        products = self._load_products_config(config_path)
-        repo_name = repository.split('/')[-1]
-        product_name = self._find_product_for_repo(products, repo_name)
-
-        if not product_name:
-            print(f"ℹ️  No product mapping found for '{repo_name}' — skipping '{field_name}' field")
-            return True
-
-        print(f"Repo '{repo_name}' → product '{product_name}'")
-
-        try:
-            field_data = self.get_org_issue_field(org, field_name)
-            if not field_data:
-                print(f"ℹ️  No '{field_name}' org issue field found — skipping")
-                return True
-
-            field_id = field_data['id']
-            options = field_data.get('options', [])
-            if options:
-                valid_names = [o['name'] for o in options]
-                if product_name not in valid_names:
-                    print(
-                        f"⚠️  '{product_name}' is not a valid option for org '{field_name}'. "
-                        f"Available: {valid_names}",
-                        file=sys.stderr
-                    )
-                    return False
-
-            self.set_org_issue_field_value(repository, issue_number, field_id, product_name)
-            print(f"✅ Set org '{field_name}' to '{product_name}' on {repository}#{issue_number}")
-            return True
-
-        except GitHubAPIError as e:
-            print(f"❌ {e}", file=sys.stderr)
-            return False
-
 
 def main():
     """Main entry point for CLI usage."""
