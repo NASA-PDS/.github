@@ -1,0 +1,25 @@
+name: Audit pds-products.yaml
+
+on:
+  schedule:
+    # Mondays at 09:07 UTC
+    - cron: '7 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit pds-products.yaml against NASA-PDS org
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Audit pds-products.yaml
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_GITHUB_TOKEN }}
+          ORG: NASA-PDS
+          CONFIG_PATH: conf/pds-products.yaml
+        run: python3 .github/scripts/audit-pds-products.py
