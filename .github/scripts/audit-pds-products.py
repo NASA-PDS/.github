@@ -84,9 +84,18 @@ def gh_api(args: list) -> str:
     return result.stdout.strip()
 
 
-def list_org_repos(org: str) -> set:
-    """Return names of all non-archived, non-fork repos in the org."""
-    repos = set()
+def list_org_repos(org: str) -> tuple:
+    """Return (active_repos, all_repos).
+
+    active_repos — non-archived, non-fork repos; used for the MISSING check so
+                   forks and archived repos don't generate spurious "not in config"
+                   warnings.
+    all_repos    — every repo in the org including forks and archived; used for
+                   the STALE check so repos that exist (even as forks) are not
+                   falsely flagged as missing from the org.
+    """
+    active_repos = set()
+    all_repos = set()
     page = 1
     while True:
         raw = gh_api([f'orgs/{org}/repos?per_page=100&page={page}'])
@@ -94,12 +103,13 @@ def list_org_repos(org: str) -> set:
         if not batch:
             break
         for r in batch:
+            all_repos.add(r['name'])
             if not r.get('archived') and not r.get('fork'):
-                repos.add(r['name'])
+                active_repos.add(r['name'])
         if len(batch) < 100:
             break
         page += 1
-    return repos
+    return active_repos, all_repos
 
 
 def annotate(level: str, message: str) -> None:
@@ -141,18 +151,21 @@ def main() -> int:
 
     print(f"\nFetching repos from {org} org ...")
     try:
-        org_repos = list_org_repos(org)
+        active_org_repos, all_org_repos = list_org_repos(org)
     except subprocess.CalledProcessError as e:
         print(f"ERROR: failed to list org repos: {e.stderr}", file=sys.stderr)
         return 1
 
-    print(f"  {len(org_repos)} repos found in org")
+    print(f"  {len(all_org_repos)} repos found in org ({len(active_org_repos)} active, "
+          f"{len(all_org_repos) - len(active_org_repos)} forks/archived)")
 
     # All repos in config (ignored or not) — used for stale check
     all_config_repos = config_repos | ignored_repos
 
-    missing = sorted(org_repos - all_config_repos)
-    stale = sorted(all_config_repos - org_repos)
+    # MISSING: active org repos not accounted for in config at all
+    missing = sorted(active_org_repos - all_config_repos)
+    # STALE: config entries pointing to repos that don't exist in the org (even as forks)
+    stale = sorted(all_config_repos - all_org_repos)
 
     discrepancies = len(missing) + len(stale)
 

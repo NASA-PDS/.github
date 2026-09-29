@@ -68,7 +68,6 @@ products:
     work_stream: "core-data-services"
     work_area: "Core Data Services"
     repositories:
-      - pds-view-legacy
       - pds4-viewer-support
       - pds4-jparser
       - portal-ds-view
@@ -105,9 +104,6 @@ products:
       - registry-stac-api
       - registry-sweepers
       - harvest
-      - supplementer
-      - tracking-service-legacy
-      - tracking-ui
       - pds4-graph
 
   search-api:
@@ -121,7 +117,6 @@ products:
       - pds-api
       - pds-api-client
       - search-api-notebook
-      - planetary-data-engine
       - dd-search
 
   validate:
@@ -154,8 +149,6 @@ products:
       - portal-legacy
       - portal-legacy-docker
       - nasa-pds.github.io
-      - planetarydata.org
-      - pds-web-mgmt
       - EdWG
 
   web-design:
@@ -175,11 +168,9 @@ products:
     repositories:
       - web-modernization
       - feedback-widget
-      - s3-browser-awssdk
       - s3-browser-cloudfront
       - gis-web-client
       - api-subpath
-      - search-ui-legacy
       - portal-search-ui-legacy
       - portal-drupal
       - portal-infra
@@ -200,6 +191,9 @@ products:
       - cloud-tools
       - cosmo-sign
       - notification-service
+      - pds-cds-infra
+      - terra-wrangler
+      - blockinator
 
   nucleus:
     description: "Nucleus workflow platform for planetary data processing"
@@ -231,6 +225,7 @@ products:
     repositories:
       - cloud-ops
       - monitoring
+      - aws-utils
 
   operations:
     description: "PDS Engineering Node operations and issue tracking"
@@ -248,7 +243,7 @@ products:
     work_area: "PDS Cybersecurity"
     repositories:
       - pds-security-roadmap
-      - pds-ato
+      - waf-emergency-stop
 
   pdc-node-support:
     description: "PDC node engineering support, tenant onboarding, and migration"
@@ -265,7 +260,6 @@ products:
     work_area: "Core Data Services"
     repositories:
       - pds-swg
-      - software-issues-repo
       - systems-engineering
       - ".github"
       - lasso-issues
@@ -276,7 +270,6 @@ products:
       - template-repo-java
       - template-repo-nodejs
       - template-repo-python
-      - product_relationships
       - oias-if
       - outlaw-tracker
 
@@ -340,26 +333,9 @@ products:
       - archive-viewer
 
   archived_repositories:
-    description: "Archive repositories"
+    description: "Archive repositories — repos that have been removed from the org"
     ignore: true
-    repositories:
-      - pds-github-util
-      - pds-doi-legacy
-      - doi-ui
-      - pds-view-legacy
-      - registry-api-service
-      - registry-ci
-      - registry-ingest-util-legacy
-      - pds-api-javalib
-      - pds-api-pythonlib
-      - pds-api-service
-      - api-search-query-lexer
-      - planetary-data-login
-      - pds4-migrate-tools
-      - pds4-npm-utils
-      - pds4-product-registry
-      - email-app
-      - pds-thin-egress-app
+    repositories: []
 
 # Metadata about forked repositories
 forked_repositories:
