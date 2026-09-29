@@ -14,7 +14,8 @@ This is the NASA-PDS organization-level `.github` repository. It serves two func
 - **sprint-backlog label** — Adding this label puts an issue into the current sprint iteration on the active sprint project. Removing it clears the sprint field (does not remove the issue from the project).
 - **Sprint project** — Currently NASA-PDS Project #25 (used in `move-to-next-iteration.yml`).
 - **ORG_PROJECT_PAT** — Required secret for all project-management workflows. Uses a PAT from the `pdsen-ci` service account with `project` scope. `GITHUB_TOKEN` cannot write to org-level projects.
-- **Product field** — A single-select field set on both org-level issues and project items. Populated via `conf/pds-products.yaml`, which maps repo names → product display names.
+- **Product field** — Org-level single-select issue field. Populated via `conf/pds-products.yaml`, which maps repo names → product display names. No longer set on project items.
+- **Work Area field** — Org-level single-select issue field mapping to the PDS-ENG account structure (e.g., `Core Data Services`, `PDS Operations`). Derived from `conf/pds-products.yaml`. Inherited from the root parent issue in a hierarchy; cascades to all sub-issues.
 
 ## Workflows Architecture
 
@@ -23,20 +24,41 @@ This is the NASA-PDS organization-level `.github` repository. It serves two func
 | `move-to-next-iteration.yml` | Org-wide scheduled | Thursdays 07:00 UTC; manual dispatch |
 | `add-issue-to-project.yml` | Reusable (`workflow_call`) | Called by other repos |
 | `label-to-project.yml` | Reusable (`workflow_call`) | Called by other repos |
-| `issue-project-automation.yml` | Template to copy to repos | Issues opened/labeled/unlabeled |
+| `issue-project-automation.yml` | Default + per-repo template (see below) | Issues opened/labeled/unlabeled |
 | `stale-prs-slack.yml` | Org-wide scheduled | Weekday mornings; manual dispatch |
 
 **Reusable workflows** (called via `uses:`) check out scripts from this repo using sparse checkout of `.github/scripts/` and `conf/`, then execute `project-utils.sh` (bash) or `project_automation.py` (Python).
 
+### `issue-project-automation.yml`: two roles, one file
+
+This file serves two distinct roles and it is important not to conflate them:
+
+1. **Org-wide default** — Because this lives in the NASA-PDS `.github` repo, GitHub automatically applies it to any NASA-PDS repository that does *not* have its own `.github/workflows/issue-project-automation.yml`. No action is needed in those repos; they inherit it directly.
+
+2. **Per-repo template** — When a repo needs customization (e.g. a different `project_numbers` value), a maintainer copies this file into that repo's own `.github/workflows/`. That copy is then **fully owned by the individual repo** and is no longer kept in sync with this file automatically. Changes made here do **not** propagate to repos that have their own copy.
+
+**Consequences for maintenance:**
+- Changes to the *reusable* workflows (`label-to-project.yml`, `add-issue-to-project.yml`) and scripts (`project_automation.py`) are picked up automatically by all callers on their next run — no per-repo updates needed.
+- Changes to `issue-project-automation.yml` itself (triggers, job structure, new jobs) only affect repos still using the org default. Repos with their own copy must be updated manually.
+- Before modifying `issue-project-automation.yml`, check how many repos have their own copy so you can assess the update surface.
+
 ## Scripts
 
 ### `.github/scripts/project_automation.py`
-Python CLI using `gh` CLI subprocess calls for GitHub Projects V2 GraphQL API. Central class: `GitHubProjectAutomation`. CLI subcommands:
-- `add-to-build-project --label BXX` — adds issue to all projects titled `BXX`; `--set-sprint-if-backlog` also sets current sprint when `sprint-backlog` is present; `--config conf/pds-products.yaml` also sets the project-level Product field
+Python CLI using `gh` CLI subprocess calls for GitHub Projects V2 GraphQL API and org issue fields REST API. Central class: `GitHubProjectAutomation`. CLI subcommands:
+
+**Project / sprint management:**
+- `add-to-build-project --label BXX` — adds issue to all projects titled `BXX`; `--set-sprint-if-backlog` also sets current sprint when `sprint-backlog` is present
 - `remove-from-build-project --label BXX` — removes issue from the build project
 - `add-to-sprint` — sets iteration to `@current` on all build projects for this issue
 - `remove-from-sprint` — clears the sprint/iteration field on all build projects
-- `set-product-field --config conf/pds-products.yaml` — sets the Product field at both org level and on any `--project-numbers` items
+
+**Org issue field management:**
+- `sync-fields --config conf/pds-products.yaml [--set-product-field] [--set-work-area]` — sets org-level Product and/or Work Area fields in a single batched PUT (preserves all other existing field values). Work Area walks the full parent chain to the root issue to inherit the correct value, then cascades to all sub-issues. Pass `--no-cascade` to skip cascade.
+- `backfill-fields --config conf/pds-products.yaml [--work-area] [--product]` — on-demand sweep of all open issues missing the specified fields. Supports `--repo REPO` (single repo), `--dry-run`, `--force` (re-set even if already set).
+
+**Label cascade:**
+- `cascade-label --label BXX [--label-action add|remove]` — adds or removes a build label on all sub-issues recursively. Default action is `add`.
 
 ### `.github/scripts/project-utils.sh`
 Bash utility functions sourced by workflows: `get_issue_id`, `get_project_id_by_number`, `get_project_by_title`, `ensure_issue_in_project`, `add_to_sprint`, `remove_from_sprint`.
@@ -51,16 +73,18 @@ Builds a Slack Block Kit JSON payload from stale PR data. Called by `stale-prs-s
 
 ### `conf/pds-products.yaml`
 Maps product names to repositories. Key fields per product:
-- `github_project_name` — display name used as the project-level Product field value
-- `ignore: true` — repos that should be excluded from org-level tooling (forks, archived, etc.)
-- `work_stream` — `core-data-services` | `planetary-data-cloud` | `web-modernization`
+- `github_project_name` — display name used as the org-level Product field value
+- `work_area` — org-level Work Area field value; one of: `Core Data Services`, `PDS Operations`, `PDC Cloud Operations`, `PDC Node Support`, `PDC Platform Engineering`, `PDS Cybersecurity`, `Planetary Data UX`
+- `work_stream` — top-level roll-up: `core-data-services` | `planetary-data-cloud` | `web-modernization`
+- `ignore: true` — repos excluded from org-level tooling (forks, archived, etc.)
 - `core_backbone: true` — critical infrastructure; receives scoring bonus
 
 ## Root-Level Scripts
 
-- `add_b18_sprint_to_project.py` — Finds all issues with `label:B18 AND label:sprint-backlog`, adds them to the B18 project, sets current sprint.
-- `add_b17_to_project.py` — Same pattern for B17.
-- `backfill_product_field.py` — Backfills the Product field (org-level and project-level) for all open issues. Supports `--dry-run`, `--force`, `--repo REPO`. Imports `GitHubProjectAutomation` from `.github/scripts/project_automation.py`.
+- `move_sprint_backlog.py` — Carries open sprint-backlog issues forward to a new build sprint by adding the new build label. Accepts `--from OLD_BUILD --to NEW_BUILD` (e.g. `--from B18 --to B19`). Idempotent; supports `--dry-run`. The existing `label-to-project` automation then adds the re-labeled issues to the new build project and sets the current sprint.
+- `add_b18_sprint_to_project.py` — Finds all issues with `label:B18 AND label:sprint-backlog`, adds them to the B18 project, sets current sprint. (Build-specific; superseded by `move_sprint_backlog.py` for future sprints.)
+- `add_b17_to_project.py` — Same pattern for B17. (Build-specific legacy script.)
+- `backfill_product_field.py` — Legacy script; superseded by `project_automation.py backfill-fields --product`.
 
 Run with: `python3 <script>.py` (requires `gh` CLI authenticated with project-scope PAT).
 
@@ -83,14 +107,49 @@ Run with: `python3 <script>.py` (requires `gh` CLI authenticated with project-sc
 ### Test `project_automation.py` directly
 ```bash
 export GH_TOKEN=$(gh auth token)
+
+# Set Product + Work Area on a single issue (cascades Work Area to sub-issues)
+python3 .github/scripts/project_automation.py \
+  sync-fields \
+  --repository NASA-PDS/validate \
+  --issue-number 42 \
+  --org NASA-PDS \
+  --config conf/pds-products.yaml \
+  --set-product-field \
+  --set-work-area
+
+# Add issue to build project and set sprint if sprint-backlog present
 python3 .github/scripts/project_automation.py \
   add-to-build-project \
   --repository NASA-PDS/validate \
   --issue-number 42 \
   --org NASA-PDS \
-  --label B18 \
-  --set-sprint-if-backlog \
-  --config conf/pds-products.yaml
+  --label B19 \
+  --set-sprint-if-backlog
+
+# Cascade a build label to all sub-issues of a parent
+python3 .github/scripts/project_automation.py \
+  cascade-label \
+  --repository NASA-PDS/systems-engineering \
+  --issue-number 165 \
+  --label B19 \
+  --label-action add
+
+# Backfill Work Area + Product on all open issues in one repo (dry-run first)
+python3 .github/scripts/project_automation.py \
+  backfill-fields \
+  --org NASA-PDS \
+  --config conf/pds-products.yaml \
+  --repo validate \
+  --work-area --product \
+  --dry-run
+
+# Apply backfill across the whole org
+python3 .github/scripts/project_automation.py \
+  backfill-fields \
+  --org NASA-PDS \
+  --config conf/pds-products.yaml \
+  --work-area --product
 ```
 
 ### Test the Tumbleweeds pipeline locally (see `.github/scripts/README.md` for full steps)
@@ -116,7 +175,8 @@ gh workflow run move-to-next-iteration.yml --repo NASA-PDS/.github
 - All scripts require `gh` CLI authenticated as a user with org project write access.
 - Workflows require `ORG_PROJECT_PAT` secret; private repos need it set at both org AND repo level.
 - Python scripts use only stdlib + `subprocess` (no pip dependencies), except `backfill_product_field.py` which imports from the scripts directory.
-- When adding new build sprints (e.g., B19): create a migration script following the pattern in `add_b18_sprint_to_project.py`, and update the default labels in `task.yml`.
+- When adding new build sprints (e.g., B19): run `move_sprint_backlog.py --from B18 --to B19` to carry over open sprint-backlog issues, and update the default labels in `task.yml`.
+- The org issue field PUT endpoint replaces all field values — `set_org_issue_field_values` always reads existing values first and merges before writing to avoid wiping unrelated fields (Priority, Effort, dates, etc.).
 
 ## Slack App Setup (Tumbleweeds)
 

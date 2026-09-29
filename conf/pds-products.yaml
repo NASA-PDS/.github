@@ -7,6 +7,10 @@
 #       description: Brief description of the product
 #       github_project_name: "Name in GitHub Projects" (optional - only for products used in planning)
 #       work_stream: "core-data-services" | "planetary-data-cloud" | "web-modernization" (optional)
+#       work_area: GitHub org issue field value — one of:
+#                  "Core Data Services" | "PDS Operations" | "PDC Cloud Operations" |
+#                  "PDC Node Support" | "PDC Platform Engineering" | "PDS Cybersecurity" |
+#                  "Planetary Data UX"
 #       ignore: true/false - if true, this product should be ignored by any processing tool / software
 #       core_backbone: true/false - if true, repositories in this product receive +2 scoring bonus (critical infrastructure)
 #       core_backbone_justification: Rationale for core backbone designation (optional, for documentation)
@@ -20,6 +24,7 @@ products:
     description: "PDS Open Archival Information System (OAIS) utilities for deep archive operations"
     github_project_name: "Deep Archive"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     repositories:
       - deep-archive
 
@@ -27,6 +32,7 @@ products:
     description: "DevOps tools, CI/CD pipelines, and automation infrastructure"
     github_project_name: "DevOps"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     repositories:
       - devops
       - github-actions-base
@@ -40,6 +46,7 @@ products:
     description: "Digital Object Identifier (DOI) service for PDS data products"
     github_project_name: "DOI Service"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     repositories:
       - doi-service
 
@@ -47,6 +54,7 @@ products:
     description: "PDS4 Information Model, ontology, and data dictionary tools"
     github_project_name: "PDS4 Information Model"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     repositories:
       - pds4-information-model
       - ldd-manager
@@ -58,6 +66,7 @@ products:
     description: "Tools for viewing and visualizing PDS4 data products"
     github_project_name: "PDS View"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     repositories:
       - pds-view-legacy
       - pds4-viewer-support
@@ -69,6 +78,7 @@ products:
     description: "Planetary Data Explorer Python (PEPPi) client library"
     github_project_name: "peppi"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     core_backbone: true
     core_backbone_justification: "Key client library for programmatic data access"
     repositories:
@@ -78,6 +88,7 @@ products:
     description: "PDS Registry backend services and data loading tools"
     github_project_name: "Registry Tools"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     core_backbone: true
     core_backbone_justification: "Core data storage, search, and retrieval infrastructure"
     repositories:
@@ -103,6 +114,7 @@ products:
     description: "PDS Search API and client libraries"
     github_project_name: "Search API"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     core_backbone: true
     core_backbone_justification: "Primary public API for accessing PDS data"
     repositories:
@@ -116,6 +128,7 @@ products:
     description: "PDS4 data product validation tools"
     github_project_name: "Validate"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     repositories:
       - validate
       - validate-test
@@ -125,6 +138,7 @@ products:
     description: "PDC Observability, web analytics tools and monitoring"
     github_project_name: "observability"
     work_stream: "planetary-data-cloud"
+    work_area: "PDC Platform Engineering"
     repositories:
       - o11y-cloudfront-batch
       - o11y-cloudfront-streaming
@@ -134,6 +148,7 @@ products:
     description: "PDS website content management and legacy systems"
     github_project_name: "Web Content"
     work_stream: "web-modernization"
+    work_area: "Core Data Services"
     repositories:
       - portal
       - portal-legacy
@@ -147,6 +162,7 @@ products:
     description: "PDS Web Design System (WDS) components and implementations"
     github_project_name: "Web Design"
     work_stream: "web-modernization"
+    work_area: "Core Data Services"
     repositories:
       - wds-react-legacy
       - wds-web
@@ -155,6 +171,7 @@ products:
     description: "Web development tools and demonstration applications"
     github_project_name: "Web Dev"
     work_stream: "web-modernization"
+    work_area: "Core Data Services"
     repositories:
       - web-modernization
       - feedback-widget
@@ -172,6 +189,7 @@ products:
     description: "Planetary Data Cloud platform infrastructure and engineering"
     github_project_name: "Cloud Platform Engineering"
     work_stream: "planetary-data-cloud"
+    work_area: "PDC Platform Engineering"
     core_backbone: true
     core_backbone_justification: "Critical cloud infrastructure and platform services"
     repositories:
@@ -187,6 +205,7 @@ products:
     description: "Nucleus workflow platform for planetary data processing"
     github_project_name: "Nucleus"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     repositories:
       - nucleus
       - nucleus-configurator
@@ -198,6 +217,7 @@ products:
     description: "Data Upload Manager (DUM) for managing data uploads to PDC"
     github_project_name: "Data Upload Manager"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     repositories:
       - data-upload-manager
 
@@ -205,6 +225,7 @@ products:
     description: "Cloud operations, utilities, and authentication"
     github_project_name: "Cloud Operations"
     work_stream: "planetary-data-cloud"
+    work_area: "PDC Cloud Operations"
     core_backbone: true
     core_backbone_justification: "Operational tooling and monitoring for cloud services"
     repositories:
@@ -215,17 +236,37 @@ products:
     description: "PDS Engineering Node operations and issue tracking"
     github_project_name: "Operations"
     work_stream: "core-data-services"
+    work_area: "PDS Operations"
     repositories:
       - operations
       - en-ops-utils
+
+  pds-cybersecurity:
+    description: "PDS cybersecurity authorization, compliance, and ATO planning"
+    github_project_name: "PDS ATO"
+    work_stream: "core-data-services"
+    work_area: "PDS Cybersecurity"
+    repositories:
+      - pds-security-roadmap
+      - pds-ato
+
+  pdc-node-support:
+    description: "PDC node engineering support, tenant onboarding, and migration"
+    github_project_name: "PDC Node Support"
+    work_stream: "planetary-data-cloud"
+    work_area: "PDC Node Support"
+    repositories:
+      - pdc-tenant-infra
 
   system-engineering:
     description: "System-level engineering, requirements, and documentation"
     github_project_name: "Systems Engineering"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     repositories:
       - pds-swg
       - software-issues-repo
+      - systems-engineering
       - ".github"
       - lasso-issues
       - lasso-releasers
@@ -243,6 +284,7 @@ products:
     description: "Integration and testing infrastructure"
     github_project_name: "I&T and Release"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     repositories:
       - system-i-n-t
       - newman-with-testrail-reporter
@@ -251,6 +293,7 @@ products:
     description: "System-level utilities and libraries"
     github_project_name: "Systems Engineering"
     work_stream: "core-data-services"
+    work_area: "Core Data Services"
     repositories:
       - logging-core
       - pds-mcp-server

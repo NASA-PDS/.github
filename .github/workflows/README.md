@@ -73,8 +73,8 @@ These workflows are designed to be called from other repositories using `workflo
 
 **What it does**:
 1. Adds the specified issue to all listed projects (idempotent)
-2. Processes any build labels (starting with "B") on the issue
-3. Automatically adds issue to corresponding build-specific projects
+2. Sets the org-level **Product** and **Work Area** fields (Work Area cascades to sub-issues)
+3. Processes any build labels (starting with "B") on the issue and adds to corresponding build-specific projects
 
 **Usage example**:
 ```yaml
@@ -106,9 +106,10 @@ jobs:
 - `gh_token`: GitHub token with project write permissions (use `ORG_PROJECT_PAT`)
 
 **What it does**:
-- **Build labels** (starting with "B", excluding "bug"): Adds issue to build-specific project
-- **sprint-backlog label added**: Adds issue to the current sprint project
-- **sprint-backlog label removed**: Removes issue from the sprint project
+- **Build label added** (starting with "B", excluding "bug"): Adds issue to build-specific project; sets org-level Product and Work Area fields; cascades the build label and Work Area to all sub-issues
+- **Build label removed**: Removes issue from build project; removes the label from all sub-issues
+- **sprint-backlog label added**: Adds issue to the current sprint iteration
+- **sprint-backlog label removed**: Clears the sprint field on the issue
 
 **Usage example**:
 ```yaml
@@ -139,8 +140,9 @@ jobs:
 **What it does**:
 This is a **complete example** showing how to use the reusable workflows above. When copied to a repository, it provides:
 
-1. **New issue automation**: Automatically adds newly opened issues to default project(s)
-2. **Label automation**: Handles build labels and sprint-backlog labels
+1. **New issue automation**: Adds newly opened issues to default project(s); sets Product and Work Area fields
+2. **Label automation**: Handles build labels (cascade to sub-issues) and sprint-backlog labels
+3. **Transfer automation**: Re-evaluates and cascades Work Area when an issue is transferred to a new repo
 
 **How to use in your repository**:
 1. Copy this workflow to your repo's `.github/workflows/` directory
@@ -169,7 +171,33 @@ All workflows require the `ORG_PROJECT_PAT` secret:
 These workflows depend on:
 
 - **Scripts**: `.github/scripts/project-utils.sh` and `.github/scripts/project_automation.py` from the NASA-PDS/.github repository
+- **Config**: `conf/pds-products.yaml` — maps repositories to Product and Work Area values
 - **External Actions**: `blombard/move-to-next-iteration@master` (for sprint iteration management)
+
+## Running scripts locally
+
+```bash
+export GH_TOKEN=$(gh auth token)
+
+# Set Product + Work Area on a single issue (cascades Work Area to sub-issues)
+python3 .github/scripts/project_automation.py sync-fields \
+  --repository NASA-PDS/validate --issue-number 42 --org NASA-PDS \
+  --config conf/pds-products.yaml --set-product-field --set-work-area
+
+# Cascade a build label to all sub-issues of a parent theme
+python3 .github/scripts/project_automation.py cascade-label \
+  --repository NASA-PDS/systems-engineering --issue-number 165 \
+  --label B19 --label-action add
+
+# Backfill Work Area + Product on all issues in one repo (dry-run first)
+python3 .github/scripts/project_automation.py backfill-fields \
+  --org NASA-PDS --config conf/pds-products.yaml \
+  --repo validate --work-area --product --dry-run
+
+# Apply backfill across the whole org
+python3 .github/scripts/project_automation.py backfill-fields \
+  --org NASA-PDS --config conf/pds-products.yaml --work-area --product
+```
 
 ---
 
