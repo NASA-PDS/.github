@@ -20,12 +20,12 @@ on:
         description: 'GitHub token with project write permissions'
         required: true
 
-# Serialize all automation for a given issue so a near-simultaneous labeled/unlabeled
-# event doesn't race this run's read-merge-write of org field values.
-# Queue, don't cancel: this run still needs to complete.
-concurrency:
-  group: issue-automation-${{ inputs.repository }}-${{ inputs.issue_number }}
-  cancel-in-progress: false
+# NOTE: Do not add a concurrency group here. Every caller of this reusable workflow
+# (issue-project-automation.yml) already declares the same concurrency group at the
+# top level, and a reusable workflow re-declaring that identical group deadlocks:
+# GitHub cancels the run with "deadlock detected ... between a top level workflow
+# and <this job>" because the calling run can't complete until this one does, and
+# this one can't acquire the group the calling run is still holding.
 
 jobs:
   add-to-project:
