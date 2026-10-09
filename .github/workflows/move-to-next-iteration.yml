@@ -30,7 +30,7 @@ jobs:
     - uses: blombard/move-to-next-iteration@master
       with:
         owner: NASA-PDS
-        number: 34
+        number: 34    # NOTE THIS NEEDS TO BE UPDATED EVERY BUILD CHANGE!
         token: ${{ secrets.ORG_PROJECT_PAT }}
         iteration-field: sprint
         iteration: last
