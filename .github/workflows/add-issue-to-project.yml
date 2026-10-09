@@ -20,6 +20,13 @@ on:
         description: 'GitHub token with project write permissions'
         required: true
 
+# Serialize all automation for a given issue so a near-simultaneous labeled/unlabeled
+# event doesn't race this run's read-merge-write of org field values.
+# Queue, don't cancel: this run still needs to complete.
+concurrency:
+  group: issue-automation-${{ inputs.repository }}-${{ inputs.issue_number }}
+  cancel-in-progress: false
+
 jobs:
   add-to-project:
     runs-on: ubuntu-latest
