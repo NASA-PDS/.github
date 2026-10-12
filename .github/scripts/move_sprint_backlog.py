@@ -70,7 +70,7 @@ query($cursor: String, $queryStr: String!) {
         title
         url
         repository { nameWithOwner }
-        labels(first: 20) {
+        labels(first: 100) {
           nodes { name }
         }
       }
