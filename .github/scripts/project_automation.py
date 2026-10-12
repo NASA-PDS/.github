@@ -835,6 +835,15 @@ class GitHubProjectAutomation:
                 f"Failed to read existing org field values for {repository}#{issue_number}: {e}"
             )
 
+        # Skip the PUT if every field we intend to write already has the target value.
+        # Concurrent runs for the same issue/repo always write the same Product and Work
+        # Area values (same repo → same mapping), so after the first run succeeds the
+        # second read sees the values already set and bails out here — eliminating the
+        # read-merge-write race without needing serialization at the workflow level.
+        if all(existing.get(fid) == val for fid, val in fields):
+            print(f"  ℹ️  All target field values already set on {repository}#{issue_number} — skipping PUT")
+            return
+
         # Overlay our updates
         for fid, val in fields:
             existing[fid] = val
