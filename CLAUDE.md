@@ -24,8 +24,9 @@ This is the NASA-PDS organization-level `.github` repository. It serves two func
 | `move-to-next-iteration.yml` | Org-wide scheduled | Thursdays 07:00 UTC; manual dispatch |
 | `add-issue-to-project.yml` | Reusable (`workflow_call`) | Called by other repos |
 | `label-to-project.yml` | Reusable (`workflow_call`) | Called by other repos |
-| `issue-project-automation.yml` | Default + per-repo template (see below) | Issues opened/labeled/unlabeled |
+| `issue-project-automation.yml` | Default + per-repo template (see below) | Issues opened/labeled/unlabeled/transferred |
 | `stale-prs-slack.yml` | Org-wide scheduled | Weekday mornings; manual dispatch |
+| `backfill-fields.yml` | Org-wide scheduled | Nightly 02:17 UTC; manual dispatch |
 
 **Reusable workflows** (called via `uses:`) check out scripts from this repo using sparse checkout of `.github/scripts/` and `conf/`, then execute `project-utils.sh` (bash) or `project_automation.py` (Python).
 

@@ -1,0 +1,32 @@
+name: Nightly Work Area Backfill
+
+on:
+  schedule:
+    # Runs nightly at 02:17 UTC
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  backfill-work-area:
+    name: Backfill Work Area on issues missing it
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+        with:
+          repository: NASA-PDS/.github
+          sparse-checkout: |
+            .github/scripts
+            conf
+          sparse-checkout-cone-mode: false
+
+      - name: Backfill Work Area
+        env:
+          GH_TOKEN: ${{ secrets.ORG_PROJECT_PAT }}
+        run: |
+          python3 .github/scripts/project_automation.py \
+            backfill-fields \
+            --org NASA-PDS \
+            --config conf/pds-products.yaml \
+            --work-area
