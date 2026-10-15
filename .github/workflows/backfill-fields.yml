@@ -6,6 +6,9 @@ on:
     - cron: '17 2 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   backfill-work-area:
     name: Backfill Work Area on issues missing it
