@@ -60,6 +60,8 @@ Python CLI using `gh` CLI subprocess calls for GitHub Projects V2 GraphQL API an
 **Label cascade:**
 - `cascade-label --label BXX [--label-action add|remove]` — adds or removes a build label on all sub-issues recursively. Default action is `add`.
 
+**Stale-event guard:** `add-to-build-project`, `remove-from-build-project`, `cascade-label`, `add-to-sprint` and `remove-from-sprint` re-read the issue's current labels and skip if they contradict the event (the GitHub UI label picker can drop and restore labels in quick bursts, and runs are not ordered). `--settle-seconds N` waits N seconds before that re-check on removal actions; the reusable workflow passes 15.
+
 ### `.github/scripts/move_sprint_backlog.py`
 Carries open sprint-backlog issues forward to a new build sprint by adding the new build label. The existing `label-to-project` automation then picks up the re-labeled issues and adds them to the new build project with the current sprint set. Usage: `python3 .github/scripts/move_sprint_backlog.py --from B18 --to B19 [--dry-run]`.
 

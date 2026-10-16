@@ -102,7 +102,8 @@ jobs:
             remove-from-sprint \
             --repository "${{ inputs.repository }}" \
             --issue-number ${{ inputs.issue_number }} \
-            --org "$org"
+            --org "$org" \
+            --settle-seconds 15
 
       - name: Remove from build project when build label removed
         if: inputs.action == 'unlabeled' && startsWith(inputs.label_name, 'B') && inputs.label_name != 'bug'
@@ -116,7 +117,8 @@ jobs:
             --repository "${{ inputs.repository }}" \
             --issue-number ${{ inputs.issue_number }} \
             --org "$org" \
-            --label "${{ inputs.label_name }}"
+            --label "${{ inputs.label_name }}" \
+            --settle-seconds 15
 
           # Cascade label removal to all sub-issues
           python3 .github/scripts/project_automation.py \
@@ -124,4 +126,5 @@ jobs:
             --repository "${{ inputs.repository }}" \
             --issue-number ${{ inputs.issue_number }} \
             --label "${{ inputs.label_name }}" \
-            --label-action remove || true
+            --label-action remove \
+            --settle-seconds 15 || true

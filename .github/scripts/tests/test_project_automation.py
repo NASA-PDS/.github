@@ -337,5 +337,126 @@ class TestGetIssueSubIssuesPagination(unittest.TestCase):
         self.assertEqual(result, [])
 
 
+class TestStaleLabelEvents(unittest.TestCase):
+    """Handlers must not act on a labeled/unlabeled event the issue has already moved past."""
+
+    REPO = "NASA-PDS/repo"
+
+    def setUp(self):
+        self.auto = GitHubProjectAutomation()
+
+    def _labels_now(self, present):
+        self.auto._run_gh_api = MagicMock(return_value="B19\n" if present else "")
+
+    def test_stale_when_label_present_but_expected_absent(self):
+        self._labels_now(True)
+        self.assertTrue(self.auto.is_stale_label_event(self.REPO, 1, "B19", expect_present=False))
+
+    def test_stale_when_label_absent_but_expected_present(self):
+        self._labels_now(False)
+        self.assertTrue(self.auto.is_stale_label_event(self.REPO, 1, "B19", expect_present=True))
+
+    def test_not_stale_when_state_matches(self):
+        for present in (True, False):
+            with self.subTest(present=present):
+                self._labels_now(present)
+                self.assertFalse(self.auto.is_stale_label_event(self.REPO, 1, "B19", expect_present=present))
+
+    def test_api_error_is_treated_as_current_event(self):
+        self.auto._run_gh_api = MagicMock(side_effect=GitHubAPIError("503"))
+        self.assertFalse(self.auto.is_stale_label_event(self.REPO, 1, "B19", expect_present=False))
+        self.assertFalse(self.auto.is_stale_label_event(self.REPO, 1, "B19", expect_present=True))
+
+    @patch("project_automation.time.sleep")
+    def test_settle_waits_before_checking(self, sleep):
+        self._labels_now(False)
+        self.auto.is_stale_label_event(self.REPO, 1, "B19", False, settle_seconds=15)
+        sleep.assert_called_once_with(15)
+
+    @patch("project_automation.time.sleep")
+    def test_no_wait_by_default(self, sleep):
+        self._labels_now(False)
+        self.auto.is_stale_label_event(self.REPO, 1, "B19", False)
+        sleep.assert_not_called()
+
+    def test_remove_from_build_project_skipped_when_label_restored(self):
+        """UI dropped B19 then restored it; the stale unlabeled run must keep the project item."""
+        self._labels_now(True)
+        self.auto.get_issue_id = MagicMock()
+        self.auto.remove_issue_from_project = MagicMock()
+
+        self.assertTrue(self.auto.remove_issue_from_build_project(self.REPO, 1, "NASA-PDS", "B19"))
+
+        self.auto.get_issue_id.assert_not_called()
+        self.auto.remove_issue_from_project.assert_not_called()
+
+    def test_remove_from_build_project_proceeds_when_label_really_gone(self):
+        self._labels_now(False)
+        self.auto.get_issue_id = MagicMock(return_value="ISSUE_ID")
+        self.auto.get_projects_by_title = MagicMock(return_value=[{"id": "P", "number": 7}])
+        self.auto.is_issue_in_project = MagicMock(return_value="ITEM")
+        self.auto.remove_issue_from_project = MagicMock()
+
+        self.auto.remove_issue_from_build_project(self.REPO, 1, "NASA-PDS", "B19")
+
+        self.auto.remove_issue_from_project.assert_called_once_with("P", "ITEM")
+
+    def test_add_to_build_project_skipped_when_label_already_dropped(self):
+        self._labels_now(False)
+        self.auto.get_issue_id = MagicMock()
+        self.auto.ensure_issue_in_project = MagicMock()
+
+        self.assertTrue(self.auto.add_issue_to_build_project(self.REPO, 1, "NASA-PDS", "B19"))
+
+        self.auto.get_issue_id.assert_not_called()
+        self.auto.ensure_issue_in_project.assert_not_called()
+
+    def test_cascade_remove_skipped_when_parent_label_restored(self):
+        self._labels_now(True)
+        self.auto.get_issue_id = MagicMock()
+        self.auto._cascade_label = MagicMock()
+
+        self.assertEqual(self.auto.cascade_label_to_sub_issues(self.REPO, 1, "B19", "remove"), 0)
+
+        self.auto._cascade_label.assert_not_called()
+
+    def test_cascade_add_skipped_when_parent_label_dropped(self):
+        self._labels_now(False)
+        self.auto.get_issue_id = MagicMock()
+        self.auto._cascade_label = MagicMock()
+
+        self.assertEqual(self.auto.cascade_label_to_sub_issues(self.REPO, 1, "B19", "add"), 0)
+
+        self.auto._cascade_label.assert_not_called()
+
+    def test_cascade_runs_when_state_matches_action(self):
+        for action, present in (("add", True), ("remove", False)):
+            with self.subTest(action=action):
+                self._labels_now(present)
+                self.auto.get_issue_id = MagicMock(return_value="PARENT_ID")
+                self.auto._cascade_label = MagicMock(return_value=2)
+
+                self.assertEqual(self.auto.cascade_label_to_sub_issues(self.REPO, 1, "B19", action), 2)
+
+                self.auto._cascade_label.assert_called_once_with("PARENT_ID", "B19", action)
+
+    def test_back_to_back_flap_never_touches_sub_issues(self):
+        """B19 removed then re-added within seconds: every queued unlabeled run is a no-op."""
+        self._labels_now(True)  # final state: B19 is on the parent
+        self.auto.get_issue_id = MagicMock()
+        self.auto._run_gh_api = MagicMock(return_value="B19\n")
+        self.auto.remove_issue_from_project = MagicMock()
+
+        for _ in range(3):  # three stale unlabeled events delivered after the restore
+            self.auto.cascade_label_to_sub_issues(self.REPO, 1, "B19", "remove")
+            self.auto.remove_issue_from_build_project(self.REPO, 1, "NASA-PDS", "B19")
+
+        self.auto.get_issue_id.assert_not_called()
+        self.auto.remove_issue_from_project.assert_not_called()
+        for c in self.auto._run_gh_api.call_args_list:
+            self.assertNotIn("DELETE", c.args[0])
+            self.assertNotIn("POST", c.args[0])
+
+
 if __name__ == "__main__":
     unittest.main()
