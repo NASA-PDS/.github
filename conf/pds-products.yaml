@@ -187,6 +187,7 @@ products:
       - planetary-data-cloud
       - pdc-cds-infra
       - pdc-tf-modules
+      - pdc-tenant-infra
       - proxycrypt
       - cloud-tools
       - cosmo-sign
@@ -245,13 +246,14 @@ products:
       - pds-security-roadmap
       - waf-emergency-stop
 
-  pdc-node-support:
-    description: "PDC node engineering support, tenant onboarding, and migration"
-    github_project_name: "PDC Node Support"
-    work_stream: "planetary-data-cloud"
-    work_area: "PDC Node Support"
-    repositories:
-      - pdc-tenant-infra
+  # None at this time
+  # pdc-node-support:
+  #  description: "PDC node engineering support, tenant onboarding, and migration"
+  #  github_project_name: "PDC Node Support"
+  #  work_stream: "planetary-data-cloud"
+  #  work_area: "PDC Node Support"
+  #  repositories:
+  #    - 
 
   system-engineering:
     description: "System-level engineering, requirements, and documentation"
