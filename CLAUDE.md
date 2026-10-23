@@ -24,8 +24,9 @@ This is the NASA-PDS organization-level `.github` repository. It serves two func
 | `move-to-next-iteration.yml` | Org-wide scheduled | Thursdays 07:00 UTC; manual dispatch |
 | `add-issue-to-project.yml` | Reusable (`workflow_call`) | Called by other repos |
 | `label-to-project.yml` | Reusable (`workflow_call`) | Called by other repos |
-| `issue-project-automation.yml` | Default + per-repo template (see below) | Issues opened/labeled/unlabeled |
+| `issue-project-automation.yml` | Default + per-repo template (see below) | Issues opened/labeled/unlabeled/transferred |
 | `stale-prs-slack.yml` | Org-wide scheduled | Weekday mornings; manual dispatch |
+| `backfill-fields.yml` | Org-wide scheduled | Nightly 02:17 UTC; manual dispatch |
 
 **Reusable workflows** (called via `uses:`) check out scripts from this repo using sparse checkout of `.github/scripts/` and `conf/`, then execute `project-utils.sh` (bash) or `project_automation.py` (Python).
 
@@ -56,6 +57,9 @@ Python CLI using `gh` CLI subprocess calls for GitHub Projects V2 GraphQL API an
 **Org issue field management:**
 - `sync-fields --config conf/pds-products.yaml [--set-product-field] [--set-work-area]` — sets org-level Product and/or Work Area fields in a single batched PUT (preserves all other existing field values). Work Area walks the full parent chain to the root issue to inherit the correct value, then cascades to all sub-issues. Pass `--no-cascade` to skip cascade.
 - `backfill-fields --config conf/pds-products.yaml [--work-area] [--product]` — on-demand sweep of all open issues missing the specified fields. Supports `--repo REPO` (single repo), `--dry-run`, `--force` (re-set even if already set).
+
+**Recent-issue backfill:**
+- `backfill-recent --config conf/pds-products.yaml [--since-days 10] [--project-numbers 6] [--repo REPO] [--dry-run]` — re-runs the issue-opened automation on all issues (open and closed) created in the last N days: adds to the default project(s), sets Product + Work Area, and adds to the build project for each `BXX` label (setting the sprint when `sprint-backlog` is present). Idempotent. Exits non-zero if any issue had a failed step.
 
 **Label cascade:**
 - `cascade-label --label BXX [--label-action add|remove]` — adds or removes a build label on all sub-issues recursively. Default action is `add`.
