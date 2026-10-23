@@ -11,6 +11,7 @@ import json
 import sys
 import re
 import os
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 
 
@@ -1632,6 +1633,144 @@ class GitHubProjectAutomation:
             )
         return updated
 
+    def _fetch_recent_issues(self, repository: str, cutoff: str) -> List[Dict[str, Any]]:
+        """Fetch issues (open and closed, no PRs) created at or after cutoff (ISO 8601, UTC).
+
+        Pages newest-first and stops once an issue older than the cutoff is seen.
+        """
+        issues: List[Dict[str, Any]] = []
+        page = 1
+        while True:
+            try:
+                page_json = self._run_gh_api([
+                    f"repos/{repository}/issues?state=all&sort=created&direction=desc&per_page=100&page={page}",
+                    "--jq", "[.[] | select(.pull_request == null) | "
+                            "{number: .number, title: .title, created_at: .created_at, "
+                            "labels: [.labels[].name]}]"
+                ])
+                page_issues = json.loads(page_json) if page_json else []
+            except (GitHubAPIError, json.JSONDecodeError) as e:
+                print(f"  ⚠️  Could not list issues for {repository}: {e}", file=sys.stderr)
+                break
+
+            if not page_issues:
+                break
+
+            issues.extend(i for i in page_issues if i['created_at'] >= cutoff)
+            if len(page_issues) < 100 or page_issues[-1]['created_at'] < cutoff:
+                break
+            page += 1
+
+        return issues
+
+    def _backfill_recent_issue(
+        self,
+        repository: str,
+        issue: Dict[str, Any],
+        org: str,
+        config_path: str,
+        project_numbers: List[int],
+        dry_run: bool
+    ) -> bool:
+        """Re-run the issue-opened automation on one issue. Returns True if every step succeeded."""
+        number = issue['number']
+        build_labels = [l for l in issue['labels'] if BUILD_LABEL_RE.match(l)]
+        print(f"  #{number}: {issue['title']}")
+
+        if dry_run:
+            print(f"    [dry-run] projects={project_numbers}, Product + Work Area, "
+                  f"build labels={build_labels or 'none'}"
+                  f"{', sprint' if 'sprint-backlog' in issue['labels'] else ''}")
+            return True
+
+        ok = True
+
+        # 1. Default project(s)
+        try:
+            issue_id = self.get_issue_id(repository, number)
+            for project_number in project_numbers:
+                project_id = self.get_project_id_by_number(org, project_number)
+                if not project_id:
+                    print(f"    ❌ Could not find project #{project_number}", file=sys.stderr)
+                    ok = False
+                    continue
+                self.ensure_issue_in_project(project_id, issue_id)
+                print(f"    ✅ In project #{project_number}")
+        except GitHubAPIError as e:
+            print(f"    ❌ Default project: {e}", file=sys.stderr)
+            ok = False
+
+        # 2. Product + Work Area org fields
+        if not self.sync_fields(
+            repository, number, org, config_path, set_product=True, set_work_area=True
+        ):
+            ok = False
+
+        # 3. Build projects (and sprint when sprint-backlog is present)
+        for label in build_labels:
+            try:
+                if not self.add_issue_to_build_project(
+                    repository, number, org, label, set_sprint_if_backlog=True
+                ):
+                    ok = False
+            except SystemExit:
+                # add_issue_to_build_project exits on API errors; keep sweeping.
+                ok = False
+
+        return ok
+
+    def backfill_recent(
+        self,
+        org: str,
+        config_path: str,
+        since_days: int = 10,
+        project_numbers: Optional[List[int]] = None,
+        repo_filter: Optional[str] = None,
+        dry_run: bool = False
+    ) -> int:
+        """Re-run the issue-opened automation on issues created in the last since_days days.
+
+        Per issue: add to the default project(s), set Product + Work Area, and add to the
+        build project for each build label (setting the sprint when sprint-backlog is present).
+        All steps are idempotent.
+
+        Returns:
+            Number of issues that failed at least one step
+        """
+        if not os.path.exists(config_path):
+            print(f"⚠️  Products config not found: {config_path}", file=sys.stderr)
+            return 0
+
+        project_numbers = project_numbers or [6]
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=since_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        print(f"Backfilling issues created since {cutoff}")
+
+        products = self._load_products_config(config_path)
+        seen = set()
+        processed = failed = 0
+
+        for info in products.values():
+            if info.get('ignore'):
+                continue
+            for repo_name in info.get('repositories', []):
+                if (repo_filter and repo_name != repo_filter) or repo_name in seen:
+                    continue
+                seen.add(repo_name)
+                repository = f"{org}/{repo_name}"
+                issues = self._fetch_recent_issues(repository, cutoff)
+                if not issues:
+                    continue
+                print(f"\nProcessing {repository}: {len(issues)} recent issue(s)")
+                for issue in issues:
+                    processed += 1
+                    if not self._backfill_recent_issue(
+                        repository, issue, org, config_path, project_numbers, dry_run
+                    ):
+                        failed += 1
+
+        print(f"\n{'[dry-run] ' if dry_run else ''}Processed {processed} issue(s), {failed} with failures")
+        return failed
+
 def main():
     """Main entry point for CLI usage."""
     import argparse
@@ -1644,7 +1783,7 @@ def main():
         choices=[
             "add-to-sprint", "remove-from-sprint",
             "add-to-build-project", "remove-from-build-project",
-            "sync-fields", "backfill-fields", "cascade-label",
+            "sync-fields", "backfill-fields", "backfill-recent", "cascade-label",
         ],
         help="Action to perform"
     )
@@ -1717,6 +1856,17 @@ def main():
         help="For backfill-fields: limit to a single repo name"
     )
     parser.add_argument(
+        "--since-days",
+        type=int,
+        default=10,
+        help="For backfill-recent: process issues created in the last N days (default: 10)"
+    )
+    parser.add_argument(
+        "--project-numbers",
+        default="6",
+        help="For backfill-recent: comma-separated default project numbers (default: 6)"
+    )
+    parser.add_argument(
         "--label-action",
         choices=["add", "remove"],
         default="add",
@@ -1740,7 +1890,7 @@ def main():
     ORG_REQUIRED = {
         "add-to-sprint", "remove-from-sprint",
         "add-to-build-project", "remove-from-build-project",
-        "sync-fields", "backfill-fields",
+        "sync-fields", "backfill-fields", "backfill-recent",
     }
     if args.action in ORG_REQUIRED and not args.org:
         print(f"❌ --org is required for {args.action}", file=sys.stderr)
@@ -1804,6 +1954,25 @@ def main():
             force=args.force
         )
         sys.exit(0)
+
+    elif args.action == "backfill-recent":
+        if not args.config:
+            print("❌ --config is required for backfill-recent", file=sys.stderr)
+            sys.exit(1)
+        try:
+            project_numbers = [int(n) for n in args.project_numbers.split(",") if n.strip()]
+        except ValueError:
+            print("❌ --project-numbers must be comma-separated integers", file=sys.stderr)
+            sys.exit(1)
+        failed = automation.backfill_recent(
+            args.org,
+            args.config,
+            since_days=args.since_days,
+            project_numbers=project_numbers,
+            repo_filter=args.repo,
+            dry_run=args.dry_run
+        )
+        sys.exit(1 if failed else 0)
 
     elif args.action == "add-to-build-project":
         if not args.repository or args.issue_number is None:
