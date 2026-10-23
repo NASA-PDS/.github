@@ -11,6 +11,7 @@ import json
 import sys
 import re
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 
@@ -556,6 +557,42 @@ class GitHubProjectAutomation:
         except GitHubAPIError:
             return False
 
+    def label_present(self, repository: str, issue_number: int, label: str) -> Optional[bool]:
+        """Like issue_has_label, but returns None when the API call fails."""
+        try:
+            result = self._run_gh_api([
+                f"repos/{repository}/issues/{issue_number}",
+                "--jq", f'.labels[].name | select(. == "{label}")'
+            ])
+            return bool(result.strip())
+        except GitHubAPIError:
+            return None
+
+    def is_stale_label_event(
+        self,
+        repository: str,
+        issue_number: int,
+        label: str,
+        expect_present: bool,
+        settle_seconds: int = 0
+    ) -> bool:
+        """True if the issue's current labels contradict the event being handled.
+
+        The GitHub UI label picker can drop and restore labels in quick bursts, and runs
+        are not ordered, so a handler for a `labeled`/`unlabeled` event may run after the
+        label has already changed back. Acting on that stale event would delete project
+        items or sub-issue labels that should stay. If the state cannot be read, the
+        event is treated as current.
+        """
+        if settle_seconds > 0:
+            time.sleep(settle_seconds)
+        present = self.label_present(repository, issue_number, label)
+        if present is None or present == expect_present:
+            return False
+        state = "present" if present else "absent"
+        print(f"ℹ️  '{label}' is now {state} on {repository}#{issue_number} — stale event, skipping")
+        return True
+
     def add_issue_to_build_project(
         self,
         repository: str,
@@ -583,6 +620,9 @@ class GitHubProjectAutomation:
         if not BUILD_LABEL_RE.match(label):
             print(f"ℹ️  Label '{label}' does not match build label pattern (B followed by digits) - skipping")
             return True  # Not an error, just not a build label
+
+        if self.is_stale_label_event(repository, issue_number, label, expect_present=True):
+            return True
 
         try:
             # Get issue node ID
@@ -639,7 +679,8 @@ class GitHubProjectAutomation:
         repository: str,
         issue_number: int,
         org: str,
-        label: str
+        label: str,
+        settle_seconds: int = 0
     ) -> bool:
         """Remove an issue from all build projects matching the label title.
 
@@ -648,6 +689,7 @@ class GitHubProjectAutomation:
             issue_number: Issue number
             org: Organization name
             label: Build label being removed (e.g., "B18")
+            settle_seconds: Wait this long before re-checking that the label is still gone
 
         Returns:
             True if successful, False otherwise
@@ -656,6 +698,9 @@ class GitHubProjectAutomation:
 
         if not BUILD_LABEL_RE.match(label):
             print(f"ℹ️  Label '{label}' does not match build label pattern — skipping")
+            return True
+
+        if self.is_stale_label_event(repository, issue_number, label, False, settle_seconds):
             return True
 
         try:
@@ -1354,21 +1399,29 @@ class GitHubProjectAutomation:
         repository: str,
         issue_number: int,
         label: str,
-        action: str = "add"
+        action: str = "add",
+        settle_seconds: int = 0
     ) -> int:
         """Recursively add or remove a label on all sub-issues of an issue.
+
+        Skipped when the parent's current labels contradict the action (the label was
+        restored before a remove ran, or dropped before an add ran).
 
         Args:
             repository: Repository in org/repo format
             issue_number: Issue number
             label: Label name to add or remove
             action: "add" or "remove"
+            settle_seconds: Wait this long before re-checking the parent's label
 
         Returns:
             Number of sub-issues updated
         """
         if not BUILD_LABEL_RE.match(label):
             print(f"ℹ️  '{label}' is not a build label — skipping cascade")
+            return 0
+
+        if self.is_stale_label_event(repository, issue_number, label, action == "add", settle_seconds):
             return 0
 
         try:
@@ -1873,6 +1926,12 @@ def main():
         help="For cascade-label: whether to add or remove the label on sub-issues (default: add)"
     )
     parser.add_argument(
+        "--settle-seconds",
+        type=int,
+        default=0,
+        help="For removal actions: wait this long, then skip if the label was restored meanwhile"
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         default=False,
@@ -1932,7 +1991,8 @@ def main():
             args.repository,
             args.issue_number,
             args.label,
-            action=args.label_action
+            action=args.label_action,
+            settle_seconds=args.settle_seconds
         )
         print(f"{'Added' if args.label_action == 'add' else 'Removed'} '{args.label}' on {count} sub-issue(s)")
         sys.exit(0)
@@ -2003,7 +2063,8 @@ def main():
             args.repository,
             args.issue_number,
             args.org,
-            args.label
+            args.label,
+            settle_seconds=args.settle_seconds
         )
         sys.exit(0 if success else 1)
 
@@ -2012,6 +2073,12 @@ def main():
             print("❌ --repository and --issue-number are required", file=sys.stderr)
             sys.exit(1)
         action = "add" if args.action == "add-to-sprint" else "remove"
+        if automation.is_stale_label_event(
+            args.repository, args.issue_number, "sprint-backlog",
+            expect_present=(action == "add"),
+            settle_seconds=args.settle_seconds if action == "remove" else 0
+        ):
+            sys.exit(0)
         success_count = automation.process_sprint_for_build_labels(
             args.repository,
             args.issue_number,

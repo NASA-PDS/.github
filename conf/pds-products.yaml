@@ -174,6 +174,7 @@ products:
       - portal-search-ui-legacy
       - portal-drupal
       - portal-infra
+      - drupal-image
       - portal-search
 
   cloud-platform-engineering:
@@ -246,14 +247,13 @@ products:
       - pds-security-roadmap
       - waf-emergency-stop
 
-  # None at this time
-  # pdc-node-support:
-  #  description: "PDC node engineering support, tenant onboarding, and migration"
-  #  github_project_name: "PDC Node Support"
-  #  work_stream: "planetary-data-cloud"
-  #  work_area: "PDC Node Support"
-  #  repositories:
-  #    - 
+  pdc-node-support:
+    description: "PDC node engineering support, tenant onboarding, and migration"
+    github_project_name: "PDC Node Support"
+    work_stream: "planetary-data-cloud"
+    work_area: "PDC Node Support"
+    repositories:
+      - pdscloud-node-support
 
   system-engineering:
     description: "System-level engineering, requirements, and documentation"
