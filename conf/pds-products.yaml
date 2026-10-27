@@ -188,6 +188,7 @@ products:
       - planetary-data-cloud
       - pdc-cds-infra
       - pdc-tf-modules
+      - pdc-tenant-infra
       - proxycrypt
       - cloud-tools
       - cosmo-sign
@@ -195,7 +196,6 @@ products:
       - pds-cds-infra
       - terra-wrangler
       - blockinator
-      - pdc-tenant-infra
 
   nucleus:
     description: "Nucleus workflow platform for planetary data processing"
