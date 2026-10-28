@@ -5,7 +5,7 @@
 #   products:
 #     <product-name>:
 #       description: Brief description of the product
-#       github_project_name: "Name in GitHub Projects" (optional - only for products used in planning)
+#       github_project_name: "Product name in GitHub Projects" (optional - only for products used in planning)
 #       work_stream: "core-data-services" | "planetary-data-cloud" | "web-modernization" (optional)
 #       work_area: GitHub org issue field value — one of:
 #                  "Core Data Services" | "PDS Operations" | "PDC Cloud Operations" |
