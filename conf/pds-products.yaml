@@ -249,9 +249,9 @@ products:
 
   pdc-node-support:
     description: "PDS cloud node engineering support, tenant onboarding, and migration"
-    github_project_name: "PDS Cloud Node Support"
+    github_project_name: "Cloud Node Support"
     work_stream: "planetary-data-cloud"
-    work_area: "Cloud Node Support"
+    work_area: "PDC Node Support"
     repositories:
       - pdscloud-node-support
 
