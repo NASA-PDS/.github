@@ -240,7 +240,7 @@ products:
 
   pds-cybersecurity:
     description: "PDS cybersecurity authorization, compliance, and ATO planning"
-    github_project_name: "PDS Cybersecurity"
+    github_project_name: "Cybersecurity"
     work_stream: "core-data-services"
     work_area: "PDS Cybersecurity"
     repositories:
@@ -248,10 +248,10 @@ products:
       - waf-emergency-stop
 
   pdc-node-support:
-    description: "PDC node engineering support, tenant onboarding, and migration"
+    description: "PDS cloud node engineering support, tenant onboarding, and migration"
     github_project_name: "PDS Cloud Node Support"
     work_stream: "planetary-data-cloud"
-    work_area: "PDC Node Support"
+    work_area: "Cloud Node Support"
     repositories:
       - pdscloud-node-support
 
