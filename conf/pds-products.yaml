@@ -238,7 +238,7 @@ products:
       - operations
       - en-ops-utils
 
-  pds-cybersecurity:
+  cybersecurity:
     description: "PDS cybersecurity authorization, compliance, and ATO planning"
     github_project_name: "Cybersecurity"
     work_stream: "core-data-services"
@@ -247,7 +247,7 @@ products:
       - pds-security-roadmap
       - waf-emergency-stop
 
-  pdc-node-support:
+  cloud-node-support:
     description: "PDS cloud node engineering support, tenant onboarding, and migration"
     github_project_name: "Cloud Node Support"
     work_stream: "planetary-data-cloud"
