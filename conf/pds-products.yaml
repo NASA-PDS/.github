@@ -240,7 +240,7 @@ products:
 
   pds-cybersecurity:
     description: "PDS cybersecurity authorization, compliance, and ATO planning"
-    github_project_name: "PDS ATO"
+    github_project_name: "PDS Cybersecurity"
     work_stream: "core-data-services"
     work_area: "PDS Cybersecurity"
     repositories:
