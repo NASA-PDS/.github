@@ -12,6 +12,10 @@ set -euo pipefail
 
 OUTPUT="${1:-stale_prs.json}"
 
+# PRs per GraphQL page. Large pages with nested review data exceed GitHub's
+# ~10s GraphQL execution limit and come back as 502 Bad Gateway.
+PAGE_SIZE="${PAGE_SIZE:-25}"
+
 CUTOFF=$(date -u -d '3 days ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null \
   || date -u -v-3d '+%Y-%m-%dT%H:%M:%SZ')
 
@@ -24,7 +28,7 @@ query($endCursor: String) {
   search(
     query: "org:NASA-PDS is:pr is:open draft:false created:<__CUTOFF__"
     type: ISSUE
-    first: 100
+    first: __PAGE_SIZE__
     after: $endCursor
   ) {
     pageInfo { hasNextPage endCursor }
@@ -52,6 +56,7 @@ GRAPHQL
 )
 
 GQL_TEMPLATE="${GQL_TEMPLATE/__CUTOFF__/$CUTOFF}"
+GQL_TEMPLATE="${GQL_TEMPLATE/__PAGE_SIZE__/$PAGE_SIZE}"
 
 # Retry a single gh api graphql call (without --paginate).
 # Writes raw JSON to TMPFILE on success, returns non-zero on failure.
