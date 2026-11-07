@@ -26,6 +26,21 @@ Create `stale_prs.json` with one JSON object per line:
 {"number":3,"title":"Security patch","url":"https://github.com/NASA-PDS/registry/pull/3","createdAt":"2026-07-09T08:00:00Z","author":{"login":"dependabot"},"repository":{"nameWithOwner":"NASA-PDS/registry"},"reviewRequests":{"nodes":[]},"latestReviews":{"nodes":[{"author":{"login":"jordanpadams"},"state":"APPROVED"}]},"labels":{"nodes":[{"name":"security"},{"name":"dependencies"}]},"reviewDecision":null}
 ```
 
+### (Optional) Add GitLab merge requests
+
+`fetch-gitlab-mrs.sh` writes the same JSON shape for open, non-draft merge requests in a GitLab group (subgroups included). Append its output to `stale_prs.json`:
+
+```bash
+export GITLAB_TOKEN="<group-access-token>"
+export GITLAB_API_URL="https://<gitlab-host>/api/v4"
+export GITLAB_GROUP="<group-path>"
+
+.github/scripts/fetch-gitlab-mrs.sh gitlab_mrs.json
+cat gitlab_mrs.json >> stale_prs.json
+```
+
+The token needs role Reporter and scope `read_api` on the group. If `GITLAB_TOKEN` is unset the script writes an empty file and prints `0`. Merge request repositories appear as `gitlab:<group>/<project>`, and the review status is derived from GitLab's `detailed_merge_status` because the list API returns no approval decision.
+
 ## Step 2 — Generate the ignored-repos list
 
 ```bash
@@ -91,6 +106,7 @@ Or use the **Run workflow** button on the Actions tab.
 | `created:<CUTOFF` in search query | Only PRs open ≥ 3 days |
 | `ignore: true` in `conf/pds-products.yaml` | Repos (e.g. forks, archived, node products) silently dropped |
 | `dependabot` author without `security` label | Routine version-bump PRs dropped; security updates shown when `INCLUDE_DEPENDABOT=true` |
+| GitLab `state=opened`, `created_before`, draft filter | Only open, non-draft merge requests older than 3 days are returned |
 
 ## Slack App setup
 

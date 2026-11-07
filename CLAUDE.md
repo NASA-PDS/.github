@@ -75,8 +75,11 @@ Bash utility functions sourced by workflows: `get_issue_id`, `get_project_id_by_
 ### `.github/scripts/fetch-stale-prs.sh`
 Queries GitHub GraphQL for all open, non-draft PRs in the NASA-PDS org created more than 3 days ago. Writes one JSON object per line to an output file (default `stale_prs.json`). Fetches `reviewRequests` (pending) and `latestReviews` (already reviewed) so both sets of reviewers are available.
 
+### `.github/scripts/fetch-gitlab-mrs.sh`
+Queries the GitLab group merge requests API for open, non-draft MRs created more than 3 days ago (subgroups included) and converts each one to the same JSON shape as a PR node from `fetch-stale-prs.sh`, so `build-slack-payload.sh` renders both unchanged. Repository names are prefixed `gitlab:`. Requires `GITLAB_TOKEN`, `GITLAB_API_URL` and `GITLAB_GROUP`; when `GITLAB_TOKEN` is unset it writes an empty file and prints `0`. GitLab's list API has no approval decision, so `reviewDecision` is derived from `detailed_merge_status`. Workflow logs are public, so the script logs HTTP status codes only and never the GitLab host or response data.
+
 ### `.github/scripts/build-slack-payload.sh`
-Builds a Slack Block Kit JSON payload from stale PR data. Called by `stale-prs-slack.yml`. Accepts `stale_prs.json` and `ignored_repos.json` as positional args; writes payload to stdout. Each PR is rendered as one `context` block (compact, linked title + metadata line). Repos with `ignore: true` in `conf/pds-products.yaml` are excluded. Dependabot PRs are suppressed unless labeled `security` and `INCLUDE_DEPENDABOT=true`.
+Builds a Slack Block Kit JSON payload from stale PR and MR data. Called by `stale-prs-slack.yml`. Accepts `stale_prs.json` and `ignored_repos.json` as positional args; writes payload to stdout. Each PR or MR is rendered as one `context` block (compact, linked title + metadata line). Repos with `ignore: true` in `conf/pds-products.yaml` are excluded. Dependabot PRs are suppressed unless labeled `security` and `INCLUDE_DEPENDABOT=true`.
 
 ## Configuration
 
@@ -216,3 +219,12 @@ Slack Incoming Webhooks are permanently bound to the channel chosen at creation.
 | Secret | Value |
 |---|---|
 | `SLACK_WORKFLOW_WEBHOOK_URL` | Incoming Webhook URL from api.slack.com/apps |
+
+### Optional GitHub secrets (GitLab merge requests)
+When all three are set, `stale-prs-slack.yml` also reports stale merge requests from a GitLab group. If `GITLAB_TOKEN` is unset the GitLab step is skipped. A GitLab failure (for example an expired token) does not block the GitHub report.
+
+| Secret | Value |
+|---|---|
+| `GITLAB_TOKEN` | GitLab group access token with role Reporter and scope `read_api`. Rotate before its expiry date. |
+| `GITLAB_API_URL` | GitLab API base URL, `https://<gitlab-host>/api/v4` |
+| `GITLAB_GROUP` | GitLab group id or full path to report on |
