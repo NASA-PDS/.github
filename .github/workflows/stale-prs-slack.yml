@@ -67,10 +67,17 @@ jobs:
         env:
           SLACK_WORKFLOW_WEBHOOK_URL: ${{ secrets.SLACK_WORKFLOW_WEBHOOK_URL }}
           INCLUDE_DEPENDABOT: ${{ inputs.include_dependabot || 'false' }}
+          GITLAB_API_URL: ${{ secrets.GITLAB_API_URL }}
+          GITLAB_GROUP: ${{ secrets.GITLAB_GROUP }}
         run: |
           if [ -z "$SLACK_WORKFLOW_WEBHOOK_URL" ]; then
             echo "SLACK_WORKFLOW_WEBHOOK_URL secret is not set — skipping notification"
             exit 0
+          fi
+
+          # Link for the report footer; a numeric group id has no browsable URL, so it is skipped.
+          if [ -n "$GITLAB_API_URL" ] && [ -n "$GITLAB_GROUP" ] && ! [[ "$GITLAB_GROUP" =~ ^[0-9]+$ ]]; then
+            export GITLAB_MRS_URL="${GITLAB_API_URL%/api/v4}/groups/${GITLAB_GROUP}/-/merge_requests?state=opened"
           fi
 
           .github/scripts/build-slack-payload.sh stale_prs.json ignored_repos.json > payload.json

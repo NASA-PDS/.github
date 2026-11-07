@@ -39,7 +39,7 @@ export GITLAB_GROUP="<group-path>"
 cat gitlab_mrs.json >> stale_prs.json
 ```
 
-The token needs role Reporter and scope `read_api` on the group. If `GITLAB_TOKEN` is unset the script writes an empty file and prints `0`. Merge request repositories appear as `gitlab:<group>/<project>`, and the review status is derived from GitLab's `detailed_merge_status` because the list API returns no approval decision.
+The token needs role Reporter and scope `read_api` on the group. If `GITLAB_TOKEN` is unset the script writes an empty file and prints `0`. Merge request repositories appear as `gitlab:<group>/<project>`, and `GITLAB_API_URL` must be HTTPS. GitLab's list API returns no approval decision, so the review status comes from `detailed_merge_status`, and mergeable merge requests are checked against the approvals endpoint.
 
 ## Step 2 — Generate the ignored-repos list
 
