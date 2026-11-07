@@ -56,6 +56,10 @@ jq -s \
     if (ls | length) > 0 then " [" + (ls | join(", ")) + "]" else "" end;
   def reviewer_str(a):
     if (a | length) > 0 then a | join(", ") else "no reviewers" end;
+  # Slack mrkdwn requires these three characters to be escaped; unescaped, a
+  # title such as "Add <foo> & bar" breaks the surrounding link.
+  def esc:
+    gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
   def all_reviewers(pr):
     ((pr.reviewRequests.nodes | map(.requestedReviewer.login) | map(select(. != null))) +
      (pr.latestReviews.nodes | map(.author.login) | map(select(. != null))))
@@ -88,7 +92,7 @@ jq -s \
         ($shown | map(. as $pr | {
           "type": "context",
           "elements": [
-            {"type": "mrkdwn", "text": "*<\($pr.url)|\($pr.repository.nameWithOwner) #\($pr.number) — \($pr.title)\(label_str($pr.labels.nodes | map(.name)))>*"},
+            {"type": "mrkdwn", "text": "*<\($pr.url)|\($pr.repository.nameWithOwner) #\($pr.number) — \(($pr.title + label_str($pr.labels.nodes | map(.name))) | esc)>*"},
             {"type": "mrkdwn", "text": "\(days_old($pr.createdAt))d old  ·  \(review_label($pr.reviewDecision))  ·  \(reviewer_str(all_reviewers($pr)))"}
           ]
         })) +

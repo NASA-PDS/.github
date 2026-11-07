@@ -79,7 +79,7 @@ Queries GitHub GraphQL for all open, non-draft PRs in the NASA-PDS org created m
 Queries the GitLab group merge requests API for open, non-draft MRs created more than 3 days ago (subgroups included) and converts each one to the same JSON shape as a PR node from `fetch-stale-prs.sh`, so `build-slack-payload.sh` renders both unchanged. Repository names are prefixed `gitlab:`. Requires `GITLAB_TOKEN`, `GITLAB_API_URL` and `GITLAB_GROUP`; when `GITLAB_TOKEN` is unset it writes an empty file and prints `0`. GitLab's list API has no approval decision, so `reviewDecision` is derived from `detailed_merge_status`. Workflow logs are public, so the script logs HTTP status codes only and never the GitLab host or response data.
 
 ### `.github/scripts/build-slack-payload.sh`
-Builds a Slack Block Kit JSON payload from stale PR and MR data. Called by `stale-prs-slack.yml`. Accepts `stale_prs.json` and `ignored_repos.json` as positional args; writes payload to stdout. Each PR or MR is rendered as one `context` block (compact, linked title + metadata line). Repos with `ignore: true` in `conf/pds-products.yaml` are excluded. Dependabot PRs are suppressed unless labeled `security` and `INCLUDE_DEPENDABOT=true`.
+Builds a Slack Block Kit JSON payload from stale PR and MR data. Called by `stale-prs-slack.yml`. Accepts `stale_prs.json` and `ignored_repos.json` as positional args; writes payload to stdout. Each PR or MR is rendered as one `context` block (compact, linked title + metadata line); `&`, `<` and `>` in titles and labels are escaped for Slack mrkdwn. Repos with `ignore: true` in `conf/pds-products.yaml` are excluded. Dependabot PRs are suppressed unless labeled `security` and `INCLUDE_DEPENDABOT=true`.
 
 ## Configuration
 
