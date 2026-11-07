@@ -43,15 +43,41 @@ jobs:
           COUNT=$(.github/scripts/fetch-stale-prs.sh stale_prs.json)
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
 
+      # A GitLab failure (for example an expired token) must not block the GitHub report.
+      - name: Find open GitLab merge requests (>3 days old, non-draft)
+        id: gitlab
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          GITLAB_API_URL: ${{ secrets.GITLAB_API_URL }}
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_GROUP: ${{ secrets.GITLAB_GROUP }}
+        run: |
+          # This workflow's logs are public: mask the GitLab host so it cannot appear in error output.
+          if [ -n "$GITLAB_API_URL" ]; then
+            echo "::add-mask::$(echo "$GITLAB_API_URL" | sed -E 's#^https?://([^/:]+).*#\1#')"
+          fi
+
+          COUNT=$(.github/scripts/fetch-gitlab-mrs.sh gitlab_mrs.json)
+          cat gitlab_mrs.json >> stale_prs.json
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
       - name: Build and send Slack message
-        if: steps.stale.outputs.count != '0'
+        if: steps.stale.outputs.count != '0' || (steps.gitlab.outputs.count != '' && steps.gitlab.outputs.count != '0')
         env:
           SLACK_WORKFLOW_WEBHOOK_URL: ${{ secrets.SLACK_WORKFLOW_WEBHOOK_URL }}
           INCLUDE_DEPENDABOT: ${{ inputs.include_dependabot || 'false' }}
+          GITLAB_API_URL: ${{ secrets.GITLAB_API_URL }}
+          GITLAB_GROUP: ${{ secrets.GITLAB_GROUP }}
         run: |
           if [ -z "$SLACK_WORKFLOW_WEBHOOK_URL" ]; then
             echo "SLACK_WORKFLOW_WEBHOOK_URL secret is not set — skipping notification"
             exit 0
+          fi
+
+          # Link for the report footer; a numeric group id has no browsable URL, so it is skipped.
+          if [ -n "$GITLAB_API_URL" ] && [ -n "$GITLAB_GROUP" ] && ! [[ "$GITLAB_GROUP" =~ ^[0-9]+$ ]]; then
+            export GITLAB_MRS_URL="${GITLAB_API_URL%/api/v4}/groups/${GITLAB_GROUP}/-/merge_requests?state=opened"
           fi
 
           .github/scripts/build-slack-payload.sh stale_prs.json ignored_repos.json > payload.json
