@@ -304,6 +304,12 @@ products:
     repositories:
       - PlanetPatrol
 
+  prototypes:
+    description: "Prototype repos not in production"
+    ignore: true
+    repositories:
+      - pds-thin-egress-app
+
   dependencies:
     description: "External dependencies and forked repositories not maintained by PDS EN"
     ignore: true
@@ -350,6 +356,5 @@ forked_repositories:
   - solr-to-es
   - merge-branch
   - PDS-Pipelines
-  - pds-thin-egress-app
   - pds4_tools_prototype
   - portal-search
