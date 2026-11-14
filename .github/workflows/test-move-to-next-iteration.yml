@@ -1,0 +1,22 @@
+name: Test move-to-next-iteration script
+
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/move_to_next_iteration.py'
+      - '.github/scripts/tests/test_move_to_next_iteration.py'
+      - '.github/workflows/test-move-to-next-iteration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run unit tests
+      run: python3 -m unittest discover -s .github/scripts/tests -p test_move_to_next_iteration.py -v

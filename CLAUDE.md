@@ -12,7 +12,7 @@ This is the NASA-PDS organization-level `.github` repository. It serves two func
 
 - **Build labels** — Labels matching `^B\d+$` (e.g., `B18`, `B17`) map to a GitHub Projects V2 board for that build sprint. The label `"bug"` is explicitly excluded from build-label logic despite starting with `"B"`.
 - **sprint-backlog label** — Adding this label puts an issue into the current sprint iteration on the active sprint project. Removing it clears the sprint field (does not remove the issue from the project).
-- **Sprint project** — Currently NASA-PDS Project #25 (used in `move-to-next-iteration.yml`).
+- **Sprint project** — Currently NASA-PDS Project #34 (used in `move-to-next-iteration.yml`).
 - **ORG_PROJECT_PAT** — Required secret for all project-management workflows. Uses a PAT from the `pdsen-ci` service account with `project` scope. `GITHUB_TOKEN` cannot write to org-level projects.
 - **Product field** — Org-level single-select issue field. Populated via `conf/pds-products.yaml`, which maps repo names → product display names. No longer set on project items.
 - **Work Area field** — Org-level single-select issue field mapping to the PDS-ENG account structure (e.g., `Core Data Services`, `PDS Operations`). Derived from `conf/pds-products.yaml`. Inherited from the root parent issue in a hierarchy; cascades to all sub-issues.
@@ -68,6 +68,9 @@ Python CLI using `gh` CLI subprocess calls for GitHub Projects V2 GraphQL API an
 
 ### `.github/scripts/move_sprint_backlog.py`
 Carries open sprint-backlog issues forward to a new build sprint by adding the new build label. The existing `label-to-project` automation then picks up the re-labeled issues and adds them to the new build project with the current sprint set. Usage: `python3 .github/scripts/move_sprint_backlog.py --from B18 --to B19 [--dry-run]`.
+
+### `.github/scripts/move_to_next_iteration.py`
+Moves Projects V2 items from the last (most recently completed) sprint iteration to the current one, skipping items whose Status is excluded (`Done`). Called by `move-to-next-iteration.yml`; uses only `gh api graphql` with the token from `GH_TOKEN`. Inputs come from arguments or the environment (`PROJECT_OWNER`, `PROJECT_NUMBER`, `ITERATION_FIELD`, `EXCLUDED_STATUSES`, `FROM_ITERATION`, `TO_ITERATION`, `DRY_RUN`). `--dry-run` sends no mutation. Unit tests: `python3 -m unittest discover -s .github/scripts/tests -p test_move_to_next_iteration.py`.
 
 ### `.github/scripts/project-utils.sh`
 Bash utility functions sourced by workflows: `get_issue_id`, `get_project_id_by_number`, `get_project_by_title`, `ensure_issue_in_project`, `add_to_sprint`, `remove_from_sprint`.
