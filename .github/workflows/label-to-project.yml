@@ -24,6 +24,9 @@ on:
         description: 'GitHub token with project write permissions'
         required: true
 
+# Caller-supplied inputs (label_name, repository, issue_number) are attacker-influenced
+# text. They are passed to steps only through `env:` and read as quoted shell variables;
+# they are never interpolated into `run:` scripts with `${{ }}`.
 jobs:
   handle-label:
     runs-on: ubuntu-latest
@@ -43,24 +46,38 @@ jobs:
         if: inputs.action == 'labeled' && startsWith(inputs.label_name, 'B') && inputs.label_name != 'bug'
         env:
           GH_TOKEN: ${{ secrets.gh_token }}
+          REPOSITORY: ${{ inputs.repository }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          LABEL_NAME: ${{ inputs.label_name }}
         run: |
+          # Only build labels (B followed by digits) are processed; mirrors BUILD_LABEL_RE
+          # in project_automation.py. Anything else is ignored, as the script would do.
+          if ! [[ "$LABEL_NAME" =~ ^B[0-9]+$ ]]; then
+            echo "Label is not a build label (B followed by digits) - skipping"
+            exit 0
+          fi
+          if ! [[ "$REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ && "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Invalid repository or issue number" >&2
+            exit 1
+          fi
+
           # Extract org from repository
-          org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
+          org="${REPOSITORY%%/*}"
 
           # --set-sprint-if-backlog: also set current sprint if sprint-backlog is already on the issue
           python3 .github/scripts/project_automation.py \
             add-to-build-project \
-            --repository "${{ inputs.repository }}" \
-            --issue-number ${{ inputs.issue_number }} \
+            --repository "$REPOSITORY" \
+            --issue-number "$ISSUE_NUMBER" \
             --org "$org" \
-            --label "${{ inputs.label_name }}" \
+            --label "$LABEL_NAME" \
             --set-sprint-if-backlog
 
           # Also set org-level Product and Work Area fields
           python3 .github/scripts/project_automation.py \
             sync-fields \
-            --repository "${{ inputs.repository }}" \
-            --issue-number ${{ inputs.issue_number }} \
+            --repository "$REPOSITORY" \
+            --issue-number "$ISSUE_NUMBER" \
             --org "$org" \
             --config conf/pds-products.yaml \
             --set-product-field \
@@ -69,39 +86,53 @@ jobs:
           # Cascade build label to all sub-issues
           python3 .github/scripts/project_automation.py \
             cascade-label \
-            --repository "${{ inputs.repository }}" \
-            --issue-number ${{ inputs.issue_number }} \
-            --label "${{ inputs.label_name }}" \
+            --repository "$REPOSITORY" \
+            --issue-number "$ISSUE_NUMBER" \
+            --label "$LABEL_NAME" \
             --label-action add || true
 
       - name: Add to sprint when sprint-backlog label added
         if: inputs.action == 'labeled' && inputs.label_name == 'sprint-backlog'
         env:
           GH_TOKEN: ${{ secrets.gh_token }}
+          REPOSITORY: ${{ inputs.repository }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
         run: |
+          if ! [[ "$REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ && "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Invalid repository or issue number" >&2
+            exit 1
+          fi
+
           # Extract org from repository
-          org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
+          org="${REPOSITORY%%/*}"
 
           # Run Python automation script
           python3 .github/scripts/project_automation.py \
             add-to-sprint \
-            --repository "${{ inputs.repository }}" \
-            --issue-number ${{ inputs.issue_number }} \
+            --repository "$REPOSITORY" \
+            --issue-number "$ISSUE_NUMBER" \
             --org "$org"
 
       - name: Remove from sprint when sprint-backlog label removed
         if: inputs.action == 'unlabeled' && inputs.label_name == 'sprint-backlog'
         env:
           GH_TOKEN: ${{ secrets.gh_token }}
+          REPOSITORY: ${{ inputs.repository }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
         run: |
+          if ! [[ "$REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ && "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Invalid repository or issue number" >&2
+            exit 1
+          fi
+
           # Extract org from repository
-          org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
+          org="${REPOSITORY%%/*}"
 
           # Run Python automation script
           python3 .github/scripts/project_automation.py \
             remove-from-sprint \
-            --repository "${{ inputs.repository }}" \
-            --issue-number ${{ inputs.issue_number }} \
+            --repository "$REPOSITORY" \
+            --issue-number "$ISSUE_NUMBER" \
             --org "$org" \
             --settle-seconds 15
 
@@ -109,22 +140,36 @@ jobs:
         if: inputs.action == 'unlabeled' && startsWith(inputs.label_name, 'B') && inputs.label_name != 'bug'
         env:
           GH_TOKEN: ${{ secrets.gh_token }}
+          REPOSITORY: ${{ inputs.repository }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          LABEL_NAME: ${{ inputs.label_name }}
         run: |
-          org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
+          # Only build labels (B followed by digits) are processed; mirrors BUILD_LABEL_RE
+          # in project_automation.py. Anything else is ignored, as the script would do.
+          if ! [[ "$LABEL_NAME" =~ ^B[0-9]+$ ]]; then
+            echo "Label is not a build label (B followed by digits) - skipping"
+            exit 0
+          fi
+          if ! [[ "$REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ && "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Invalid repository or issue number" >&2
+            exit 1
+          fi
+
+          org="${REPOSITORY%%/*}"
 
           python3 .github/scripts/project_automation.py \
             remove-from-build-project \
-            --repository "${{ inputs.repository }}" \
-            --issue-number ${{ inputs.issue_number }} \
+            --repository "$REPOSITORY" \
+            --issue-number "$ISSUE_NUMBER" \
             --org "$org" \
-            --label "${{ inputs.label_name }}" \
+            --label "$LABEL_NAME" \
             --settle-seconds 15
 
           # Cascade label removal to all sub-issues
           python3 .github/scripts/project_automation.py \
             cascade-label \
-            --repository "${{ inputs.repository }}" \
-            --issue-number ${{ inputs.issue_number }} \
-            --label "${{ inputs.label_name }}" \
+            --repository "$REPOSITORY" \
+            --issue-number "$ISSUE_NUMBER" \
+            --label "$LABEL_NAME" \
             --label-action remove \
             --settle-seconds 15 || true
