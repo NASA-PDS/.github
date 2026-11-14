@@ -27,7 +27,7 @@ jobs:
         git commit --allow-empty -m "chore: keepalive [skip ci]"
         git push
 
-    - uses: blombard/move-to-next-iteration@master
+    - uses: blombard/move-to-next-iteration@8fb535cfb55cf73166dac4760bc23d80860e3996 # v0.7.0
       with:
         owner: NASA-PDS
         number: 34    # NOTE THIS NEEDS TO BE UPDATED EVERY BUILD CHANGE!
