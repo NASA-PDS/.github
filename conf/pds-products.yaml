@@ -246,17 +246,7 @@ products:
     work_stream: "core-data-services"
     work_area: "PDS Cybersecurity"
     repositories:
-      - pds-security-roadmap
-
-  cybersecurity:
-    description: "PDS cybersecurity authorization, compliance, and ATO planning"
-    github_project_name: "Cybersecurity"
-    work_stream: "core-data-services"
-    work_area: "PDS Cybersecurity"
-    repositories:
-      - pds-security-roadmap
-      - waf-emergency-stop
-      - outlaw-tracker
+      - pds-ato-roadmap
 
   cloud-node-support:
     description: "PDS cloud node engineering support, tenant onboarding, and migration"
