@@ -228,6 +228,8 @@ products:
       - cloud-ops
       - monitoring
       - aws-utils
+      - waf-emergency-stop
+      - outlaw-tracker
 
   operations:
     description: "PDS Engineering Node operations and issue tracking"
@@ -245,7 +247,16 @@ products:
     work_area: "PDS Cybersecurity"
     repositories:
       - pds-security-roadmap
+
+  cybersecurity:
+    description: "PDS cybersecurity authorization, compliance, and ATO planning"
+    github_project_name: "Cybersecurity"
+    work_stream: "core-data-services"
+    work_area: "PDS Cybersecurity"
+    repositories:
+      - pds-security-roadmap
       - waf-emergency-stop
+      - outlaw-tracker
 
   cloud-node-support:
     description: "PDS cloud node engineering support, tenant onboarding, and migration"
@@ -273,7 +284,6 @@ products:
       - template-repo-nodejs
       - template-repo-python
       - oias-if
-      - outlaw-tracker
 
   integration-and-testing:
     description: "Integration and testing infrastructure"
