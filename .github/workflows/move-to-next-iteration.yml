@@ -5,6 +5,11 @@ on:
     # Runs "at 07:00, only on Thursday" (see https://crontab.guru)
     - cron: '0 14 * * 5'
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run: list the items that would move without changing the project'
+        type: boolean
+        default: false
 
 jobs:
   move-to-next-iteration:
@@ -27,12 +32,14 @@ jobs:
         git commit --allow-empty -m "chore: keepalive [skip ci]"
         git push
 
-    - uses: blombard/move-to-next-iteration@master
-      with:
-        owner: NASA-PDS
-        number: 34    # NOTE THIS NEEDS TO BE UPDATED EVERY BUILD CHANGE!
-        token: ${{ secrets.ORG_PROJECT_PAT }}
-        iteration-field: sprint
-        iteration: last
-        new-iteration: current
-        excluded-statuses: "Done"
+    - name: Move items from the last iteration to the current iteration
+      env:
+        GH_TOKEN: ${{ secrets.ORG_PROJECT_PAT }}
+        PROJECT_OWNER: NASA-PDS
+        PROJECT_NUMBER: '34'    # NOTE THIS NEEDS TO BE UPDATED EVERY BUILD CHANGE!
+        ITERATION_FIELD: sprint
+        FROM_ITERATION: last
+        TO_ITERATION: current
+        EXCLUDED_STATUSES: 'Done'
+        DRY_RUN: ${{ inputs.dry_run }}
+      run: python3 .github/scripts/move_to_next_iteration.py
