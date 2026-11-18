@@ -106,13 +106,15 @@ jobs:
       - name: Process build labels
         env:
           GH_TOKEN: ${{ secrets.gh_token }}
+          REPOSITORY: ${{ inputs.repository }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
         run: |
           # Extract org from repository
-          org=$(echo "${{ inputs.repository }}" | cut -d'/' -f1)
+          org="${REPOSITORY%%/*}"
 
           # Get all labels starting with "B" on this issue
-          echo "Checking for build labels on issue #${{ inputs.issue_number }}..."
-          build_labels=$(gh api "repos/${{ inputs.repository }}/issues/${{ inputs.issue_number }}" \
+          echo "Checking for build labels on issue #$ISSUE_NUMBER..."
+          build_labels=$(gh api "repos/$REPOSITORY/issues/$ISSUE_NUMBER" \
             --jq '.labels[].name | select(startswith("B"))')
 
           if [ -z "$build_labels" ]; then
@@ -134,8 +136,8 @@ jobs:
             # --config: also sets the Product single-select field on the project item
             python3 .github/scripts/project_automation.py \
               add-to-build-project \
-              --repository "${{ inputs.repository }}" \
-              --issue-number ${{ inputs.issue_number }} \
+              --repository "$REPOSITORY" \
+              --issue-number "$ISSUE_NUMBER" \
               --org "$org" \
               --label "$label"
 

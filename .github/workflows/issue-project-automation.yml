@@ -71,12 +71,14 @@ jobs:
       - name: Re-evaluate and cascade Work Area
         env:
           GH_TOKEN: ${{ secrets.ORG_PROJECT_PAT }}
+          REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          org=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+          org="${REPOSITORY%%/*}"
           python3 .github/scripts/project_automation.py \
             sync-fields \
-            --repository "${{ github.repository }}" \
-            --issue-number ${{ github.event.issue.number }} \
+            --repository "$REPOSITORY" \
+            --issue-number "$ISSUE_NUMBER" \
             --org "$org" \
             --config conf/pds-products.yaml \
             --set-work-area
