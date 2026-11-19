@@ -1,0 +1,63 @@
+name: GitLab Reachability Test
+
+# Checks that GitHub-hosted runners can reach the internal GitLab API and that
+# the GitLab token is valid. Only HTTP status codes are logged: this repository
+# is public, so no response data or hostnames may appear in the logs.
+#
+# Status codes:
+#   000  could not connect (network path blocked or host not resolvable)
+#   401  reached the server but not authenticated (expected for the anonymous call)
+#   200  success
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/gitlab-reachability-test.yml
+
+permissions:
+  contents: read
+
+jobs:
+  reachability:
+    name: Check GitLab API access
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GITLAB_API_URL: ${{ secrets.GITLAB_API_URL }}
+      GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+
+    steps:
+      - name: Check secrets are configured
+        run: |
+          if [ -z "$GITLAB_API_URL" ]; then
+            echo "GITLAB_API_URL secret is not set"
+            exit 1
+          fi
+          if [ -z "$GITLAB_TOKEN" ]; then
+            echo "GITLAB_TOKEN secret is not set"
+            exit 1
+          fi
+
+      - name: Anonymous request (network reachability)
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$GITLAB_API_URL/version" || true)
+          echo "anonymous status: $code"
+          if [ "$code" = "000" ]; then
+            echo "GitLab API is not reachable from GitHub-hosted runners"
+            exit 1
+          fi
+
+      - name: Authenticated request (token validity)
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 \
+            -H "PRIVATE-TOKEN: $GITLAB_TOKEN" "$GITLAB_API_URL/version" || true)
+          echo "authenticated status: $code"
+          test "$code" = "200"
+
+      - name: Authenticated request (read_api group access)
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 \
+            -H "PRIVATE-TOKEN: $GITLAB_TOKEN" "$GITLAB_API_URL/groups?per_page=1" || true)
+          echo "group listing status: $code"
+          test "$code" = "200"
